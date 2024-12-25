@@ -1,4 +1,3 @@
-
 import requests
 import json
 from geopy.distance import geodesic
@@ -6,6 +5,22 @@ from urllib.parse import quote
 from halo import Halo
 from datetime import datetime
 import pytz
+import os
+
+ADDRESS_FILE = "addresses.txt"
+
+def load_addresses():
+    """Loads previously entered addresses from a file."""
+    if os.path.exists(ADDRESS_FILE):
+        with open(ADDRESS_FILE, "r") as f:
+            return [line.strip() for line in f]
+    return []
+
+def save_addresses(addresses):
+    """Saves entered addresses to a file."""
+    with open(ADDRESS_FILE, "w") as f:
+        for address in addresses:
+            f.write(address + "\n")
 
 def geocode_address(address):
     """
@@ -43,7 +58,6 @@ def geocode_address(address):
         return None, None, None
     finally:
         spinner.stop()
-
 
 def generate_google_maps_url(latitude, longitude, label):
     """
@@ -161,7 +175,6 @@ def get_detailed_conditions(latitude, longitude):
     finally:
         spinner.stop()
 
-
 def format_time(iso_time):
     """
     Formats an ISO time string to a more user-friendly format with timezone.
@@ -219,7 +232,7 @@ def get_nearest_stations(latitude, longitude):
         stations_data = stations_response.json()
 
         stations = stations_data['features'][:4]
-        
+
         station_forecasts = []
         for station in stations:
             station_id = station['properties']['stationIdentifier']
@@ -227,7 +240,7 @@ def get_nearest_stations(latitude, longitude):
             observation_response = requests.get(observation_url)
             observation_response.raise_for_status()
             observation_data = observation_response.json()
-            
+
             temperature = observation_data['properties']['temperature']
             temperature = convert_temperature(observation_data['properties']['temperature']) if temperature else None
             temperature_value = temperature['value'] if temperature else None
@@ -236,10 +249,10 @@ def get_nearest_stations(latitude, longitude):
             wind_speed = observation_data['properties']['windSpeed']
             wind_speed_value = convert_kmh_to_mph(wind_speed['value']) if wind_speed else None
             wind_speed_unit = "mph"  # Assuming mph is the target unit for conversion
-            
+
             wind_direction = observation_data['properties']['windDirection']
             wind_direction_value = wind_direction['value'] if wind_direction else None
-            
+
             station_forecasts.append({
                 'name': station['properties']['name'],
                 'temperature': f"{temperature_value}" if temperature_value else None,
@@ -254,7 +267,6 @@ def get_nearest_stations(latitude, longitude):
         return None
     finally:
         spinner.stop()
-
 
 def get_hourly_forecast(latitude, longitude):
     """
@@ -291,12 +303,33 @@ def get_hourly_forecast(latitude, longitude):
         spinner.stop()
 
 def main():
-    address = input("\nEnter a street address: ")
-    
+    stored_addresses = load_addresses()
+
+    if stored_addresses:
+        print("\nPreviously entered addresses:")
+        for i, address in enumerate(stored_addresses):
+            print(f"{i + 1}. {address}")
+        print("N. Enter a new address")
+
+        choice = input("Choose an option: ")
+        if choice.upper() == 'N':
+            address = input("Enter a street address: ")
+        elif choice.isdigit() and 1 <= int(choice) <= len(stored_addresses):
+            address = stored_addresses[int(choice) - 1]
+        else:
+            print("Invalid choice. Please try again.")
+            return
+    else:
+        address = input("\nEnter a street address: ")
+
     latitude, longitude, matched_address = geocode_address(address)
 
     if latitude is None or longitude is None:
-      return
+        return
+
+    if matched_address not in stored_addresses:
+        stored_addresses.append(matched_address)
+        save_addresses(stored_addresses)
 
     print(f"\nMatched Address: {matched_address}")
     print(f"Latitude: {latitude}, Longitude: {longitude}")
@@ -376,10 +409,32 @@ def main():
             else:
                 print("Failed to retrieve weather for nearest stations.")
         elif choice == '6':
-            address = input("Enter a street address: ")
+            stored_addresses = load_addresses()
+            if stored_addresses:
+                print("\nPreviously entered addresses:")
+                for i, address in enumerate(stored_addresses):
+                    print(f"{i + 1}. {address}")
+                print("N. Enter a new address")
+
+                choice = input("Choose an option: ")
+                if choice.upper() == 'N':
+                    address = input("Enter a street address: ")
+                elif choice.isdigit() and 1 <= int(choice) <= len(stored_addresses):
+                    address = stored_addresses[int(choice) - 1]
+                else:
+                    print("Invalid choice. Please try again.")
+                    continue
+            else:
+                address = input("Enter a street address: ")
+
             latitude, longitude, matched_address = geocode_address(address)
             if latitude is None or longitude is None:
                 continue
+
+            if matched_address not in stored_addresses:
+                stored_addresses.append(matched_address)
+                save_addresses(stored_addresses)
+
             print(f"Matched Address: {matched_address}")
             print(f"Latitude: {latitude}, Longitude: {longitude}")
             address_map_url = generate_google_maps_url(latitude, longitude, matched_address)
@@ -388,7 +443,6 @@ def main():
             break
         else:
             print("Invalid choice. Please try again.")
-
 
 if __name__ == "__main__":
     try:
