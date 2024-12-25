@@ -303,6 +303,9 @@ def get_hourly_forecast(latitude, longitude):
         spinner.stop()
 
 def main():
+
+    print("Welcome to the Weather App!")
+    
     stored_addresses = load_addresses()
 
     if stored_addresses:
