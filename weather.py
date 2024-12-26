@@ -228,7 +228,7 @@ def get_nearest_stations(latitude, longitude):
                     temperature_unit = None
 
                 wind_speed = observation_data['properties']['windSpeed']
-                wind_speed_value = convert_kmh_to_mph(wind_speed['value']) if wind_speed else None
+                wind_speed_value = convert_kmh_to_mph(wind_speed['value']) if wind_speed and wind_speed.get('value') is not None else None
                 wind_speed_unit = "mph"  # Assuming mph is the target unit for conversion
 
                 wind_direction = observation_data['properties']['windDirection']
