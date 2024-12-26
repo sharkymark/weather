@@ -71,7 +71,13 @@ def generate_google_maps_url(latitude, longitude, label):
     Returns:
         A string containing the Google Maps URL.
     """
-    return f"https://www.google.com/maps/search/?api=1&query={quote(label)}@{latitude},{longitude}"
+
+    if label == "":
+        return f"https://www.google.com/maps/search/{latitude},{longitude}/{latitude},{longitude},15z?t=s"
+    else:
+        return f"https://www.google.com/maps/search/?api=1&query={quote(label)}@{latitude},{longitude}"
+
+# end of refactor comments for AI!
 
 def _fetch_noaa_data(latitude, longitude, endpoint):
     """
@@ -170,6 +176,8 @@ def convert_kmh_to_mph(kmh):
     Returns:
         Speed in miles per hour.
     """
+    if kmh is None:
+        return None
     return round(kmh * 0.621371, 2)
 
 def convert_temperature(celsius_temperature_data):
@@ -182,9 +190,13 @@ def convert_temperature(celsius_temperature_data):
     Returns:
         A dictionary containing the temperature value in Fahrenheit and the updated unitCode.
     """
-    value = celsius_temperature_data['value']
-    celsius_temperature_data['value'] = round(value * 9/5 + 32, 2)  # Convert Celsius to Fahrenheit
-    celsius_temperature_data['unitCode'] = 'F'  # Update unit code to Fahrenheit
+    if celsius_temperature_data and celsius_temperature_data.get('value') is not None:
+        value = celsius_temperature_data['value']
+        celsius_temperature_data['value'] = round(value * 9/5 + 32, 2)  # Convert Celsius to Fahrenheit
+        celsius_temperature_data['unitCode'] = 'F'  # Update unit code to Fahrenheit
+    else:
+        celsius_temperature_data['value'] = None
+        celsius_temperature_data['unitCode'] = ""
     return celsius_temperature_data
 
 def get_nearest_stations(latitude, longitude):
@@ -228,14 +240,20 @@ def get_nearest_stations(latitude, longitude):
                     temperature_unit = None
 
                 wind_speed = observation_data['properties']['windSpeed']
-                wind_speed_value = convert_kmh_to_mph(wind_speed['value']) if wind_speed and wind_speed.get('value') is not None else None
+                wind_speed_value = convert_kmh_to_mph(wind_speed['value'])
                 wind_speed_unit = "mph"  # Assuming mph is the target unit for conversion
 
                 wind_direction = observation_data['properties']['windDirection']
                 wind_direction_value = wind_direction['value'] if wind_direction else None
 
+                latitude = station['geometry']['coordinates'][1]
+                longitude = station['geometry']['coordinates'][0]
+                address_map_url = generate_google_maps_url(latitude, longitude, "")
+
                 station_forecasts.append({
                     'name': station['properties']['name'],
+                    'station_id': station_id,
+                    'address_map_url': address_map_url,
                     'temperature': f"{temperature_value}" if temperature_value is not None else None,
                     'temperature_unit': temperature_unit,
                     'wind_speed': f"{wind_speed_value} {wind_speed_unit}" if wind_speed_value is not None else None,
@@ -367,12 +385,17 @@ def main():
             stations = get_nearest_stations(latitude, longitude)
             if stations:
                 print("\n")
+                 
                 for station in stations:
+                    # print a Google Maps URL for each station location, and update this file with the URL
                     print(f"Station Name: {station['name']}")
+                    print(f"Station ID: {station['station_id']}")
                     print(f"Temperature: {station['temperature']} {station['temperature_unit']}")
                     print(f"Wind Speed: {station['wind_speed']}")
                     print(f"Wind Direction: {station['wind_direction']}")
+                    print(f"Google Maps URL for station: {station['address_map_url']}")
                     print("-" * 20)
+                    # end of work for AI!
             else:
                 print("Failed to retrieve weather for nearest stations.")
         elif choice == '6':
