@@ -217,7 +217,7 @@ def get_nearest_stations(latitude, longitude):
             observation_response.raise_for_status()
             observation_data = observation_response.json()
 
-            if observation_  # Check if observation_data is not None
+            if observation_data is not None:  # Check if observation_data is not None
                 temperature = observation_data['properties']['temperature']
                 if temperature:
                     temperature = convert_temperature(temperature)
