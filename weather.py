@@ -8,6 +8,7 @@ import pytz
 import os
 
 ADDRESS_FILE = "addresses.txt"
+CENSUS_API_BASE_URL = "https://geocoding.geo.census.gov/geocoder/locations/onelineaddress"
 
 def load_addresses():
     """Loads previously entered addresses from a file."""
@@ -32,7 +33,6 @@ def geocode_address(address):
     Returns:
       A tuple containing (latitude, longitude) or None if geocoding fails.
     """
-    base_url = "https://geocoding.geo.census.gov/geocoder/locations/onelineaddress"
     params = {
         "address": address,
         "benchmark": "Public_AR_Current",
@@ -41,7 +41,7 @@ def geocode_address(address):
     spinner = Halo(text='Geocoding address...', spinner='dots')
     try:
         spinner.start()
-        response = requests.get(base_url, params=params)
+        response = requests.get(CENSUS_API_BASE_URL, params=params)
         response.raise_for_status()  # Raise HTTPError for bad responses (4xx or 5xx)
         data = response.json()
         if data['result']['addressMatches']:
@@ -71,7 +71,45 @@ def generate_google_maps_url(latitude, longitude, label):
     Returns:
         A string containing the Google Maps URL.
     """
-    return f"https://www.google.com/maps/search/?api=1&query={quote(label)}@{latitude},{longitude}"
+
+    if label == "":
+        return f"https://www.google.com/maps/search/{latitude},{longitude}/{latitude},{longitude},15z?t=s"
+    else:
+        return f"https://www.google.com/maps/search/?api=1&query={quote(label)}@{latitude},{longitude}"
+
+# end of refactor comments for AI!
+
+def _fetch_noaa_data(latitude, longitude, endpoint):
+    """
+    Fetches data from the NOAA API.
+
+    Args:
+        latitude: The latitude of the location.
+        longitude: The longitude of the location.
+        endpoint: The specific NOAA API endpoint (e.g., 'forecast', 'forecastHourly').
+
+    Returns:
+        A dictionary or list containing the API response, or None if the API call fails.
+    """
+    spinner = Halo(text=f'Fetching data from NOAA API...', spinner='dots')
+    try:
+        spinner.start()
+        point_url = f"https://api.weather.gov/points/{latitude},{longitude}"
+        point_response = requests.get(point_url)
+        point_response.raise_for_status()
+        point_data = point_response.json()
+
+        forecast_url = point_data['properties'][endpoint]
+        forecast_response = requests.get(forecast_url)
+        forecast_response.raise_for_status()
+        forecast_data = forecast_response.json()
+        spinner.succeed(f"Data fetched successfully from NOAA API.")
+        return forecast_data['properties']['periods'] if endpoint in ['forecast', 'forecastHourly'] else forecast_data['properties']
+    except requests.exceptions.RequestException as e:
+        spinner.fail(f"Error during NOAA API request: {e}")
+        return None
+    finally:
+        spinner.stop()
 
 def get_current_conditions(latitude, longitude):
     """
@@ -84,28 +122,8 @@ def get_current_conditions(latitude, longitude):
     Returns:
         A dictionary containing the current weather conditions, or None if the API call fails.
     """
-    spinner = Halo(text='Fetching current conditions...', spinner='dots')
-    try:
-        spinner.start()
-        # NOAA API requires coordinates to be in a specific format
-        point_url = f"https://api.weather.gov/points/{latitude},{longitude}"
-        point_response = requests.get(point_url)
-        point_response.raise_for_status()
-        point_data = point_response.json()
-
-        forecast_url = point_data['properties']['forecast']
-        forecast_response = requests.get(forecast_url)
-        forecast_response.raise_for_status()
-        forecast_data = forecast_response.json()
-
-        current_conditions = forecast_data['properties']['periods'][0]
-        spinner.succeed("Current conditions fetched successfully.")
-        return current_conditions
-    except requests.exceptions.RequestException as e:
-        spinner.fail(f"Error during NOAA API request: {e}")
-        return None
-    finally:
-        spinner.stop()
+    forecast_data = _fetch_noaa_data(latitude, longitude, 'forecast')
+    return forecast_data[0] if forecast_data else None
 
 def get_extended_forecast(latitude, longitude):
     """
@@ -118,28 +136,7 @@ def get_extended_forecast(latitude, longitude):
     Returns:
         A list of dictionaries containing the extended weather forecast, or None if the API call fails.
     """
-    spinner = Halo(text='Fetching extended forecast...', spinner='dots')
-    try:
-        spinner.start()
-        # NOAA API requires coordinates to be in a specific format
-        point_url = f"https://api.weather.gov/points/{latitude},{longitude}"
-        point_response = requests.get(point_url)
-        point_response.raise_for_status()
-        point_data = point_response.json()
-
-        forecast_url = point_data['properties']['forecast']
-        forecast_response = requests.get(forecast_url)
-        forecast_response.raise_for_status()
-        forecast_data = forecast_response.json()
-
-        extended_forecast = forecast_data['properties']['periods']
-        spinner.succeed("Extended forecast fetched successfully.")
-        return extended_forecast
-    except requests.exceptions.RequestException as e:
-        spinner.fail(f"Error during NOAA API request: {e}")
-        return None
-    finally:
-        spinner.stop()
+    return _fetch_noaa_data(latitude, longitude, 'forecast')
 
 def get_detailed_conditions(latitude, longitude):
     """
@@ -152,28 +149,7 @@ def get_detailed_conditions(latitude, longitude):
     Returns:
         A dictionary containing the detailed weather conditions, or None if the API call fails.
     """
-    spinner = Halo(text='Fetching detailed conditions...', spinner='dots')
-    try:
-        spinner.start()
-        # NOAA API requires coordinates to be in a specific format
-        point_url = f"https://api.weather.gov/points/{latitude},{longitude}"
-        point_response = requests.get(point_url)
-        point_response.raise_for_status()
-        point_data = point_response.json()
-
-        forecast_url = point_data['properties']['forecast']
-        forecast_response = requests.get(forecast_url)
-        forecast_response.raise_for_status()
-        forecast_data = forecast_response.json()
-
-        current_conditions = forecast_data['properties']['periods'][0]
-        spinner.succeed("Detailed conditions fetched successfully.")
-        return current_conditions
-    except requests.exceptions.RequestException as e:
-        spinner.fail(f"Error during NOAA API request: {e}")
-        return None
-    finally:
-        spinner.stop()
+    return _fetch_noaa_data(latitude, longitude, 'forecast')[0]
 
 def format_time(iso_time):
     """
@@ -200,27 +176,39 @@ def convert_kmh_to_mph(kmh):
     Returns:
         Speed in miles per hour.
     """
+    if kmh is None:
+        return None
     return round(kmh * 0.621371, 2)
 
-# change this function to just convert the temperature to Fahrenheit. the input will be the value of the temperature
+def convert_temperature(celsius_temperature_data):
+    """
+    Converts a Celsius temperature value to Fahrenheit.
 
-def convert_temperature(data):
+    Args:
+        celsius_temperature_ A dictionary containing the temperature value and unitCode in Celsius.
 
-    value = data['value']
-    data['value'] = round(value * 9/5 + 32, 2)  # Convert Celsius to Fahrenheit
-    data['unitCode'] = 'F'  # Update unit code to Fahrenheit
-    return data
+    Returns:
+        A dictionary containing the temperature value in Fahrenheit and the updated unitCode.
+    """
+    if celsius_temperature_data and celsius_temperature_data.get('value') is not None:
+        value = celsius_temperature_data['value']
+        celsius_temperature_data['value'] = round(value * 9/5 + 32, 2)  # Convert Celsius to Fahrenheit
+        celsius_temperature_data['unitCode'] = 'F'  # Update unit code to Fahrenheit
+    else:
+        celsius_temperature_data['value'] = None
+        celsius_temperature_data['unitCode'] = ""
+    return celsius_temperature_data
 
 def get_nearest_stations(latitude, longitude):
     """
-    Fetches weather conditions for the 2 nearest weather stations from the NOAA API.
+    Fetches weather conditions for the 4 nearest weather stations from the NOAA API.
 
     Args:
         latitude: The latitude of the location.
         longitude: The longitude of the location.
 
     Returns:
-        A list of dictionaries containing the weather conditions for the 2 nearest stations, or None if the API call fails.
+        A list of dictionaries containing the weather conditions for the nearest stations, or None if the API call fails.
     """
     spinner = Halo(text='Fetching nearest stations...', spinner='dots')
     try:
@@ -241,25 +229,40 @@ def get_nearest_stations(latitude, longitude):
             observation_response.raise_for_status()
             observation_data = observation_response.json()
 
-            temperature = observation_data['properties']['temperature']
-            temperature = convert_temperature(observation_data['properties']['temperature']) if temperature else None
-            temperature_value = temperature['value'] if temperature else None
-            temperature_unit = temperature['unitCode'] if temperature else None
+            if observation_data is not None:  # Check if observation_data is not None
+                temperature = observation_data['properties']['temperature']
+                if temperature:
+                    temperature = convert_temperature(temperature)
+                    temperature_value = temperature['value']
+                    temperature_unit = temperature['unitCode']
+                else:
+                    temperature_value = None
+                    temperature_unit = None
 
-            wind_speed = observation_data['properties']['windSpeed']
-            wind_speed_value = convert_kmh_to_mph(wind_speed['value']) if wind_speed else None
-            wind_speed_unit = "mph"  # Assuming mph is the target unit for conversion
+                wind_speed = observation_data['properties']['windSpeed']
+                wind_speed_value = convert_kmh_to_mph(wind_speed['value'])
+                wind_speed_unit = "mph"  # Assuming mph is the target unit for conversion
 
-            wind_direction = observation_data['properties']['windDirection']
-            wind_direction_value = wind_direction['value'] if wind_direction else None
+                wind_direction = observation_data['properties']['windDirection']
+                wind_direction_value = wind_direction['value'] if wind_direction else None
 
-            station_forecasts.append({
-                'name': station['properties']['name'],
-                'temperature': f"{temperature_value}" if temperature_value else None,
-                'temperature_unit': temperature_unit,
-                'wind_speed': f"{wind_speed_value} {wind_speed_unit}" if wind_speed_value else None,
-                'wind_direction': wind_direction_value
-            })
+                latitude = station['geometry']['coordinates'][1]
+                longitude = station['geometry']['coordinates'][0]
+                address_map_url = generate_google_maps_url(latitude, longitude, "")
+
+                station_forecasts.append({
+                    'name': station['properties']['name'],
+                    'station_id': station_id,
+                    'address_map_url': address_map_url,
+                    'temperature': f"{temperature_value}" if temperature_value is not None else None,
+                    'temperature_unit': temperature_unit,
+                    'wind_speed': f"{wind_speed_value} {wind_speed_unit}" if wind_speed_value is not None else None,
+                    'wind_direction': wind_direction_value
+                })
+            else:
+                # Handle the case where observation data is None, e.g., by skipping the station
+                print(f"Could not retrieve observation data for station: {station['properties']['name']}")
+
         spinner.succeed("Weather for nearest stations fetched successfully.")
         return station_forecasts
     except requests.exceptions.RequestException as e:
@@ -279,33 +282,12 @@ def get_hourly_forecast(latitude, longitude):
     Returns:
         A list of dictionaries containing the hourly weather forecast, or None if the API call fails.
     """
-    spinner = Halo(text='Fetching hourly forecast...', spinner='dots')
-    try:
-        spinner.start()
-        # NOAA API requires coordinates to be in a specific format
-        point_url = f"https://api.weather.gov/points/{latitude},{longitude}"
-        point_response = requests.get(point_url)
-        point_response.raise_for_status()
-        point_data = point_response.json()
-
-        forecast_url = point_data['properties']['forecastHourly']
-        forecast_response = requests.get(forecast_url)
-        forecast_response.raise_for_status()
-        forecast_data = forecast_response.json()
-
-        hourly_forecast = forecast_data['properties']['periods'][:12]
-        spinner.succeed("Hourly forecast fetched successfully.")
-        return hourly_forecast
-    except requests.exceptions.RequestException as e:
-        spinner.fail(f"Error during NOAA API request: {e}")
-        return None
-    finally:
-        spinner.stop()
+    return _fetch_noaa_data(latitude, longitude, 'forecastHourly')
 
 def main():
 
     print("Welcome to the Weather App!")
-    
+
     stored_addresses = load_addresses()
 
     if stored_addresses:
@@ -403,12 +385,17 @@ def main():
             stations = get_nearest_stations(latitude, longitude)
             if stations:
                 print("\n")
+                 
                 for station in stations:
+                    # print a Google Maps URL for each station location, and update this file with the URL
                     print(f"Station Name: {station['name']}")
+                    print(f"Station ID: {station['station_id']}")
                     print(f"Temperature: {station['temperature']} {station['temperature_unit']}")
                     print(f"Wind Speed: {station['wind_speed']}")
                     print(f"Wind Direction: {station['wind_direction']}")
+                    print(f"Google Maps URL for station: {station['address_map_url']}")
                     print("-" * 20)
+                    # end of work for AI!
             else:
                 print("Failed to retrieve weather for nearest stations.")
         elif choice == '6':

@@ -3,3 +3,4 @@ geopy
 halo
 datetime
 pytz
+aider-chat
