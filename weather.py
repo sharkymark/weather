@@ -355,8 +355,8 @@ def main():
         print("4. Get Detailed Conditions")
         print("5. Get Weather for Nearest Stations")
         print("6. Get Weather for a Different Location")
-        print("7. Exit")
-        print("8. Get Active Weather Alerts")
+        print("7. Get Active Weather Alerts")
+        print("8. Exit")
         choice = input("Enter your choice: ")
 
         if choice == '1':
@@ -462,8 +462,6 @@ def main():
             address_map_url = generate_google_maps_url(latitude, longitude, matched_address)
             print(f"Google Maps URL for address: {address_map_url}")
         elif choice == '7':
-            break
-        elif choice == '8':
             print("Getting active weather alerts...")
             alerts = get_active_alerts(latitude, longitude)
             if alerts:
@@ -471,17 +469,19 @@ def main():
                     print("\nActive Weather Alerts:")
                     for alert in alerts:
                         props = alert['properties']
-                        print(f"  Headline: {props['headline']}")
-                        print(f"  Description: {props['description']}")
-                        print(f"  Severity: {props['severity']}")
-                        print(f"  Urgency: {props['urgency']}")
-                        print(f"  Effective: {format_time(props['effective'])}")
-                        print(f"  Expires: {format_time(props['expires'])}")
-                        print("-" * 20)
+                        print(f"Headline: {props['headline']}")
+                        print(f"Description: {props['description']}")
+                        print(f"Severity: {props['severity']}")
+                        print(f"Urgency: {props['urgency']}")
+                        print(f"Effective: {format_time(props['effective'])}")
+                        print(f"Expires: {format_time(props['expires'])}")
+                        print("-" * 70)
                 else:
                     print("No active weather alerts for this location.")
             else:
                 print("Failed to retrieve active weather alerts.")
+        elif choice == '8':
+            break
         else:
             print("Invalid choice. Please try again.")
 
