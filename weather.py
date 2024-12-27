@@ -284,6 +284,32 @@ def get_hourly_forecast(latitude, longitude):
     """
     return _fetch_noaa_data(latitude, longitude, 'forecastHourly')
 
+def get_active_alerts(latitude, longitude):
+    """
+    Fetches active weather alerts from the NOAA API.
+
+    Args:
+        latitude: The latitude of the location.
+        longitude: The longitude of the location.
+
+    Returns:
+        A list of dictionaries containing active alerts, or None if the API call fails.
+    """
+    spinner = Halo(text='Fetching active weather alerts...', spinner='dots')
+    try:
+        spinner.start()
+        alerts_url = f"https://api.weather.gov/alerts/active?point={latitude},{longitude}"
+        response = requests.get(alerts_url)
+        response.raise_for_status()
+        alerts_data = response.json()
+        spinner.succeed("Active weather alerts fetched successfully.")
+        return alerts_data['features']
+    except requests.exceptions.RequestException as e:
+        spinner.fail(f"Error during NOAA API request for alerts: {e}")
+        return None
+    finally:
+        spinner.stop()
+
 def main():
 
     print("Welcome to the Weather App!")
@@ -330,6 +356,7 @@ def main():
         print("5. Get Weather for Nearest Stations")
         print("6. Get Weather for a Different Location")
         print("7. Exit")
+        print("8. Get Active Weather Alerts")
         choice = input("Enter your choice: ")
 
         if choice == '1':
@@ -436,6 +463,25 @@ def main():
             print(f"Google Maps URL for address: {address_map_url}")
         elif choice == '7':
             break
+        elif choice == '8':
+            print("Getting active weather alerts...")
+            alerts = get_active_alerts(latitude, longitude)
+            if alerts:
+                if alerts:
+                    print("\nActive Weather Alerts:")
+                    for alert in alerts:
+                        props = alert['properties']
+                        print(f"  Headline: {props['headline']}")
+                        print(f"  Description: {props['description']}")
+                        print(f"  Severity: {props['severity']}")
+                        print(f"  Urgency: {props['urgency']}")
+                        print(f"  Effective: {format_time(props['effective'])}")
+                        print(f"  Expires: {format_time(props['expires'])}")
+                        print("-" * 20)
+                else:
+                    print("No active weather alerts for this location.")
+            else:
+                print("Failed to retrieve active weather alerts.")
         else:
             print("Invalid choice. Please try again.")
 
