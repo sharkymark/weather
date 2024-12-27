@@ -339,6 +339,11 @@ def main():
                 print(f"\nCurrent Conditions: {conditions['name']}")
                 print(f"Temperature: {conditions['temperature']} {conditions['temperatureUnit']}")
                 print(f"Short Forecast: {conditions['shortForecast']}")
+                print(f"Wind Speed: {conditions['windSpeed']}")
+                print(f"Wind Direction: {conditions['windDirection']}")
+                value = conditions.get('probabilityOfPrecipitation', {}).get('value')
+                print(f"Precipitation Probability: {value}%") if value is not None else print("Precipitation Probability: N/A")
+                print(f"Detailed forecast: {conditions['detailedForecast']}")
             else:
                 print("Failed to retrieve current conditions.")
         elif choice == '2':
