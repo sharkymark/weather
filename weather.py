@@ -451,7 +451,16 @@ def main():
             print(f"Matched Address: {matched_address}")
             print(f"Latitude: {latitude}, Longitude: {longitude}")
             address_map_url = generate_google_maps_url(latitude, longitude, matched_address)
-            print(f"Google Maps URL for address: {address_map_url}")
+            print(f"\nGoogle Maps URL for address: {address_map_url}")
+
+            print("\nGetting current weather conditions...")
+            conditions = get_short_conditions(latitude, longitude)
+            if conditions:
+                print(f"\nTemperature: {conditions['temperature']} {conditions['temperatureUnit']}")
+                print(f"Forecast: {conditions['shortForecast']}")
+            else:
+                print("\nFailed to retrieve weather conditions.")
+
         elif choice == '5':
             print("Getting active weather alerts...")
             alerts = get_active_alerts(latitude, longitude)
