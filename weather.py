@@ -138,9 +138,9 @@ def get_extended_forecast(latitude, longitude):
     """
     return _fetch_noaa_data(latitude, longitude, 'forecast')
 
-def get_detailed_conditions(latitude, longitude):
+def get_short_conditions(latitude, longitude):
     """
-    Fetches detailed weather conditions from the NOAA API.
+    Fetches brief weather conditions from the NOAA API.
 
     Args:
         latitude: The latitude of the location.
@@ -345,22 +345,29 @@ def main():
     print(f"\nMatched Address: {matched_address}")
     print(f"Latitude: {latitude}, Longitude: {longitude}")
     address_map_url = generate_google_maps_url(latitude, longitude, matched_address)
-    print(f"Google Maps URL for address: {address_map_url}")
+    print(f"\nGoogle Maps URL for address: {address_map_url}")
+
+    print("\nGetting current weather conditions...")
+    conditions = get_short_conditions(latitude, longitude)
+    if conditions:
+        print(f"\nTemperature: {conditions['temperature']} {conditions['temperatureUnit']}")
+        print(f"Forecast: {conditions['shortForecast']}")
+    else:
+        print("\nFailed to retrieve weather conditions.")
 
     while True:
         print("\nOptions:")
-        print("1. Get Current Conditions")
+        print("1. Get Detailed Conditions")
         print("2. Get Extended Forecast")
         print("3. Get Hourly Forecast")
-        print("4. Get Detailed Conditions")
-        print("5. Get Weather for Nearest Stations")
+        print("4. Get Weather for Nearest Stations")
+        print("5. Get Active Weather Alerts")
         print("6. Get Weather for a Different Location")
-        print("7. Get Active Weather Alerts")
-        print("8. Exit")
+        print("7. Exit")
         choice = input("Enter your choice: ")
 
         if choice == '1':
-            print("Getting current conditions...")
+            print("Getting detailed current conditions...")
             conditions = get_current_conditions(latitude, longitude)
             if conditions:
                 print(f"\nCurrent Conditions: {conditions['name']}")
@@ -397,22 +404,6 @@ def main():
             else:
                 print("Failed to retrieve hourly forecast.")
         elif choice == '4':
-            print("Getting detailed conditions...")
-            conditions = get_detailed_conditions(latitude, longitude)
-            if conditions:
-                print(f"\nCurrent Conditions: {conditions['name']}")
-                print(f"Temperature: {conditions['temperature']} {conditions['temperatureUnit']}")
-                print(f"Precipitation Probability: {conditions.get('probabilityOfPrecipitation', {}).get('value', 'N/A')}")
-                print(f"Wind Speed: {conditions['windSpeed']}")
-                print(f"Wind Direction: {conditions['windDirection']}")
-                print(f"Relative Humidity: {conditions.get('relativeHumidity', {}).get('value', 'N/A')}")
-                print(f"Dewpoint: {conditions.get('dewpoint', {}).get('value', 'N/A')} {conditions.get('dewpoint', {}).get('unitCode', 'N/A')}")
-                print(f"Visibility: {conditions.get('visibility', {}).get('value', 'N/A')} {conditions.get('visibility', {}).get('unitCode', 'N/A')}")
-                print(f"Wind Gust: {conditions.get('windGust', {}).get('value', 'N/A')} {conditions.get('windGust', {}).get('unitCode', 'N/A')}")
-                print(f"Cloud Cover: {conditions.get('cloudCover', {}).get('value', 'N/A')}")
-            else:
-                print("Failed to retrieve detailed conditions.")
-        elif choice == '5':
             print("Getting weather for nearest stations...")
             stations = get_nearest_stations(latitude, longitude)
             if stations:
@@ -461,26 +452,24 @@ def main():
             print(f"Latitude: {latitude}, Longitude: {longitude}")
             address_map_url = generate_google_maps_url(latitude, longitude, matched_address)
             print(f"Google Maps URL for address: {address_map_url}")
-        elif choice == '7':
+        elif choice == '5':
             print("Getting active weather alerts...")
             alerts = get_active_alerts(latitude, longitude)
             if alerts:
-                if alerts:
-                    print("\nActive Weather Alerts:")
-                    for alert in alerts:
-                        props = alert['properties']
-                        print(f"Headline: {props['headline']}")
-                        print(f"Description: {props['description']}")
-                        print(f"Severity: {props['severity']}")
-                        print(f"Urgency: {props['urgency']}")
-                        print(f"Effective: {format_time(props['effective'])}")
-                        print(f"Expires: {format_time(props['expires'])}")
-                        print("-" * 70)
-                else:
-                    print("No active weather alerts for this location.")
+                print("\nActive Weather Alerts:")
+                for alert in alerts:
+                    props = alert['properties']
+                    print(f"Headline: {props['headline']}")
+                    print(f"Description: {props['description']}")
+                    print(f"Severity: {props['severity']}")
+                    print(f"Urgency: {props['urgency']}")
+                    print(f"Effective: {format_time(props['effective'])}")
+                    print(f"Expires: {format_time(props['expires'])}")
+                    print("-" * 70)
             else:
-                print("Failed to retrieve active weather alerts.")
-        elif choice == '8':
+                print("No active weather alerts for this location.")
+        elif choice == '7':
+            print("\nExiting the program...")
             break
         else:
             print("Invalid choice. Please try again.")
