@@ -321,22 +321,24 @@ def main():
         for i, address in enumerate(stored_addresses):
             print(f"{i + 1}. {address}")
         print("N. Enter a new address")
-
-        choice = input("Choose an option: ")
-        if choice.upper() == 'N':
-            address = input("Enter a street address: ")
-        elif choice.isdigit() and 1 <= int(choice) <= len(stored_addresses):
-            address = stored_addresses[int(choice) - 1]
-        else:
-            print("Invalid choice. Please try again.")
-            return
+        
+        while True:
+            choice = input("Choose an option: ")
+            if choice.upper() == 'N':
+                address = input("Enter a street address: ")
+                break
+            elif choice.isdigit() and 1 <= int(choice) <= len(stored_addresses):
+                address = stored_addresses[int(choice) - 1]
+                break
+            else:
+                print("Invalid choice. Please try again.")
     else:
         address = input("\nEnter a street address: ")
 
     latitude, longitude, matched_address = geocode_address(address)
 
     if latitude is None or longitude is None:
-        print("Address not found. Please try again.")
+        print("\nAddress not found. Please try again.\n")
         main()  # Reshow the main menu
         return
 
@@ -372,7 +374,7 @@ def main():
         choice = input("Enter your choice: ")
 
         if choice == '1':
-            print("Getting detailed current conditions...")
+            print("\nGetting detailed current conditions...")
             conditions = get_current_conditions(latitude, longitude)
             if conditions:
                 print(f"\nCurrent Conditions: {conditions['name']}")
