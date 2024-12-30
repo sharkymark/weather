@@ -312,6 +312,7 @@ def get_active_alerts(latitude, longitude):
 
 def main():
 
+# refactor with a loop for the main menu in case someone enters an invalid choice AI!
     print("Welcome to the Weather App!")
 
     stored_addresses = load_addresses()
@@ -336,7 +337,7 @@ def main():
     latitude, longitude, matched_address = geocode_address(address)
 
     if latitude is None or longitude is None:
-        print("Address not found. Please try again.")
+        print("\nAddress not found. Please try again.\n")
         main()  # Reshow the main menu
         return
 
