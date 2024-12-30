@@ -312,7 +312,6 @@ def get_active_alerts(latitude, longitude):
 
 def main():
 
-# refactor with a loop for the main menu in case someone enters an invalid choice AI!
     print("Welcome to the Weather App!")
 
     stored_addresses = load_addresses()
@@ -375,7 +374,7 @@ def main():
         choice = input("Enter your choice: ")
 
         if choice == '1':
-            print("Getting detailed current conditions...")
+            print("\nGetting detailed current conditions...")
             conditions = get_current_conditions(latitude, longitude)
             if conditions:
                 print(f"\nCurrent Conditions: {conditions['name']}")
