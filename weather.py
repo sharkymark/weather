@@ -336,6 +336,8 @@ def main():
     latitude, longitude, matched_address = geocode_address(address)
 
     if latitude is None or longitude is None:
+        print("Address not found. Please try again.")
+        main()  # Reshow the main menu
         return
 
     if matched_address not in stored_addresses:
