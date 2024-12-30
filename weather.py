@@ -354,6 +354,9 @@ def main():
         print(f"Forecast: {conditions['shortForecast']}")
     else:
         print("\nFailed to retrieve weather conditions.")
+    
+    print("\nNOAA forecast webpage for this location:")
+    print(f"https://forecast.weather.gov/MapClick.php?lat={latitude}&lon={longitude}")
 
     while True:
         print("\nOptions:")
