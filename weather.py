@@ -77,7 +77,16 @@ def generate_google_maps_url(latitude, longitude, label):
     else:
         return f"https://www.google.com/maps/search/?api=1&query={quote(label)}@{latitude},{longitude}"
 
-# end of refactor comments for AI!
+
+def generate_flightradar24_url(station_id):
+    """
+    Generates a Flightradar24 URL for the given station ID.
+    Args:
+        station_id: The station ID of the location.
+    Returns:
+        A string containing the Flightradar24 URL.
+    """
+    return f"https://www.flightradar24.com/airport/{station_id}"
 
 def _fetch_noaa_data(latitude, longitude, endpoint):
     """
@@ -199,6 +208,8 @@ def convert_temperature(celsius_temperature_data):
         celsius_temperature_data['unitCode'] = ""
     return celsius_temperature_data
 
+
+
 def get_nearest_stations(latitude, longitude):
     """
     Fetches weather conditions for the 4 nearest weather stations from the NOAA API.
@@ -210,6 +221,7 @@ def get_nearest_stations(latitude, longitude):
     Returns:
         A list of dictionaries containing the weather conditions for the nearest stations, or None if the API call fails.
     """
+    
     spinner = Halo(text='Fetching nearest stations...', spinner='dots')
     try:
         spinner.start()
@@ -310,9 +322,178 @@ def get_active_alerts(latitude, longitude):
     finally:
         spinner.stop()
 
-def main():
+def get_station_weather(station_ids):
+    """
+    Fetches weather conditions for the specified airports from the NOAA API.
 
-    print("Welcome to the Weather App!")
+    Args:
+        stations: A dictionary containing the airport code and name.
+        airports: A boolean value to indicate whether the station is an airport.
+    Returns:
+        A dictionary containing the weather conditions for the specified airports, or None if the API call fails.
+    """
+
+    station_weather = []
+    for station_id in station_ids:
+
+        station_payload = {'station_id': station_id}
+    
+        # api call for station name and timezone
+        station_url = f"https://api.weather.gov/stations/{station_id}"
+        station_response = requests.get(station_url)
+        station_response.raise_for_status()
+        station_data = station_response.json()
+
+        if station_data is not None:  
+            station_payload['station_id'] = station_id
+            station_payload['station_name'] = station_data['properties']['name']
+            station_payload['timezone'] = station_data['properties']['timeZone']
+            station_payload['latitude'] = station_data['geometry']['coordinates'][1]
+            station_payload['longitude'] = station_data['geometry']['coordinates'][0]
+        else:
+            print(f"Could not retrieve station data for station: {station_id}")
+        
+        # api call for station observation data
+        observation_url = f"https://api.weather.gov/stations/{station_id}/observations/latest"
+        observation_response = requests.get(observation_url)
+        observation_response.raise_for_status()
+        observation_data = observation_response.json()
+
+        if observation_data is not None:  
+            temperature = observation_data['properties']['temperature']
+            if temperature:
+                temperature = convert_temperature(temperature)
+                temperature_value = temperature['value']
+                temperature_unit = temperature['unitCode']
+            else:
+                temperature_value = None
+                temperature_unit = None
+
+            wind_speed = observation_data['properties']['windSpeed']
+            wind_speed_value = convert_kmh_to_mph(wind_speed['value'])
+            wind_speed_unit = "mph"  # Assuming mph is the target unit for conversion
+
+            wind_direction = observation_data['properties']['windDirection']
+            wind_direction_value = wind_direction['value'] if wind_direction else None
+
+            current_conditions = observation_data['properties']['textDescription']
+
+            address_map_url = generate_google_maps_url(station_payload['latitude'], station_payload['longitude'], "")
+            airports_url = generate_flightradar24_url(station_id)
+
+            station_payload['address_map_url'] = address_map_url
+            station_payload['airports_url'] = airports_url
+            station_payload['temperature'] = f"{temperature_value}" if temperature_value is not None else None
+            station_payload['temperature_unit'] = temperature_unit
+            station_payload['wind_speed'] = f"{wind_speed_value} {wind_speed_unit}" if wind_speed_value is not None else None
+            station_payload['wind_direction'] = wind_direction_value
+            station_payload['current_conditions'] = current_conditions
+        else:
+            # Handle the case where observation data is None, e.g., by skipping the station
+            print(f"Could not retrieve observation data for station: {station_id}")
+
+        # api call for station forecast url
+        station_point_url = f"https://api.weather.gov/points/{station_payload['latitude']},{station_payload['longitude']}"
+        response = requests.get(station_point_url)
+        point_data = response.json()
+
+        if point_data is not None:
+            forecast_url = point_data['properties']['forecast']
+            forecast_response = requests.get(forecast_url)
+            forecast_data = forecast_response.json()
+            if forecast_data is not None:
+                station_payload['forecast'] = forecast_data['properties']['periods'][0]['detailedForecast']
+            else:
+                print(f"Could not retrieve forecast data for station: {station_id}")
+        else:
+            print(f"Could not retrieve point station data for station: {station_id}")
+        
+        station_weather.append(station_payload)
+
+
+    return station_weather
+
+def print_station_forecasts(station_weather):
+
+    if station_weather:
+        print("\n\nAirport Weather Conditions:\n")
+            
+        for station in station_weather:
+
+            print("-" * 20)
+            print(f"Station ID: {station['station_id']}")
+            print(f"Station Name: {station['station_name']}")
+            print(f"Temperature: {station['temperature']} {station['temperature_unit']}")
+            print(f"Wind Speed: {station['wind_speed']}")
+            print(f"Wind Direction: {station['wind_direction']}")
+            print("\n")
+            print(f"{station['address_map_url']}")
+            print(f"{station['airports_url']}")
+            print("\n")
+            print(f"Current Conditions: {station['current_conditions']}")
+            print(f"Forecast: {station['forecast']}")
+            print("\n")
+            print(f"https://forecast.weather.gov/MapClick.php?lat={station['latitude']}&lon={station['longitude']}")
+            print("\n")
+
+
+
+    else:
+        print("Failed to retrieve weather for airports.")
+
+def airports_menu():
+    
+    try:
+        spinner = Halo(text='Reading airport data from file...', spinner='dots')
+        spinner.start()
+        with open('airports.txt', 'r') as file:
+            station_ids = []
+            for line in file:
+                line = line.strip()
+                parts = line.split(',')
+                if len(parts) == 3:
+                    airport_code, airport_name, include_in_api  = parts
+                    include_in_api = include_in_api.strip().upper() == 'T'
+                    station_ids.append({
+                        'code': airport_code.strip(),
+                        'name': airport_name.strip(),
+                        'include_in_api': include_in_api
+                    })
+        
+        if not station_ids:
+            spinner.fail("No airport data found in file. Please add airport codes on new lines in the airports.txt file. e.g., KBZN")
+            return None
+        
+        spinner.succeed("Airport data read successfully.")
+
+    except FileNotFoundError:
+        spinner.fail("Airport data file not found.")
+        return None
+    finally:
+        spinner.stop()
+
+    try:
+
+        spinner = Halo(text='Filtering airports for API calls...', spinner='dots')
+        station_ids = [station['code'] for station in station_ids if station['include_in_api']]
+        if not station_ids:
+            spinner.fail("No airports are marked for API calls. Please set the third field to 'T' for the airports you want to include.")
+            return None
+        else:
+            spinner.succeed("Airports filtered successfully.")
+
+        spinner = Halo(text='Getting airport weather data from NOAA...', spinner='dots')
+        spinner.start()
+        station_weather = get_station_weather(station_ids)
+        spinner.succeed("Airport weather data fetched successfully.")
+        print_station_forecasts(station_weather)
+    except Exception as e:
+        spinner.fail(f"Error getting airport weather data: {e}")
+        return None
+    finally:
+        spinner.stop()
+
+def address_menu():
 
     stored_addresses = load_addresses()
 
@@ -368,7 +549,7 @@ def main():
         print("4. Get Weather for Nearest Stations")
         print("5. Get Active Weather Alerts")
         print("6. Get Weather for a Different Location")
-        print("7. Exit")
+        print("7. Return to Main Menu")
         choice = input("Enter your choice: ")
 
         if choice == '1':
@@ -415,7 +596,7 @@ def main():
                 print("\n")
                  
                 for station in stations:
-                    # print a Google Maps URL for each station location, and update this file with the URL
+
                     print(f"Station Name: {station['name']}")
                     print(f"Station ID: {station['station_id']}")
                     print(f"Temperature: {station['temperature']} {station['temperature_unit']}")
@@ -423,7 +604,7 @@ def main():
                     print(f"Wind Direction: {station['wind_direction']}")
                     print(f"Google Maps URL for station: {station['address_map_url']}")
                     print("-" * 20)
-                    # end of work for AI!
+
             else:
                 print("Failed to retrieve weather for nearest stations.")
         elif choice == '6':
@@ -483,10 +664,33 @@ def main():
             else:
                 print("No active weather alerts for this location.")
         elif choice == '7':
-            print("\nExiting the program...")
-            break
+            print("\n Returning to main menu...")
+            return
         else:
             print("Invalid choice. Please try again.")
+
+def main():
+
+    print("Welcome to the Weather App!")
+
+    while True:
+        print("\nMain Menu:")
+        print("1. Get specific address weather")
+        print("2. Get airport weather")
+        print("3. Exit")
+        choice = input("Enter your choice (1-3): ")        
+        print("\n")
+        if choice == '1':
+            address_menu()
+        elif choice == '2':
+            airports_menu()
+        elif choice == '3':
+            print("\n Exiting the program... Goodbye!")
+            break
+        else:
+            print("Invalid choice. Please enter a number between 1 and 3.")
+
+
 
 if __name__ == "__main__":
     try:
