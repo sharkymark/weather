@@ -12,6 +12,8 @@ A Python command-line application that provides comprehensive weather informatio
 - **Address History**: Maintains a list of previously searched addresses
 - **Google Maps Integration**: Provides Google Maps links for locations
 - **Unit Conversions**: Automatically converts between metric and imperial units
+- **Airport Weather**: Get weather data for a specific airport
+- **File loading**: Load and save address history to a file; load airport codes from a file 
 
 ## Requirements
 
@@ -46,15 +48,18 @@ python weather.py
 
 Follow the on-screen prompts to:
 1. Enter an address or select from previous addresses
-2. View current weather conditions
-3. Choose from additional options:
-   - Detailed conditions
-   - Extended forecast
-   - Hourly forecast
-   - Nearby station weather
-   - Active alerts
-   - Change location
-   - Exit
+   1. View current weather conditions
+   2. Choose from additional options:
+      - Detailed conditions
+      - Extended forecast
+      - Hourly forecast
+      - Nearby station weather
+      - Active alerts
+      - Change location
+      - Return to main menu
+2. Get airport weather data
+3. Exit the application
+
 
 ## API Keys
 
@@ -71,6 +76,7 @@ weather/
 ├── requirements.txt    # Python dependencies
 ├── .gitignore          # Git ignore file
 └── addresses.txt       # Stores previously searched addresses
+└── airports.txt        # Stores airport codes for nearby stations
 ```
 
 ## Contributing
