@@ -322,7 +322,7 @@ def get_active_alerts(latitude, longitude):
     finally:
         spinner.stop()
 
-def get_station_weather(station_ids):
+def get_station_weather(station_data):
     """
     Fetches weather conditions for the specified airports from the NOAA API.
 
@@ -334,10 +334,11 @@ def get_station_weather(station_ids):
     """
 
     station_weather = []
-    for station_id in station_ids:
+    for station_id, name in station_data:
 
         station_payload = {'station_id': station_id}
-    
+        station_payload['labelled_name'] = name
+
         # api call for station name and timezone
         station_url = f"https://api.weather.gov/stations/{station_id}"
         station_response = requests.get(station_url)
@@ -422,6 +423,7 @@ def print_station_forecasts(station_weather):
 
             print("-" * 20)
             print(f"Station ID: {station['station_id']}")
+            print(f"Labeled as: {station['labelled_name']}")
             print(f"Station Name: {station['station_name']}")
             print(f"Temperature: {station['temperature']} {station['temperature_unit']}")
             print(f"Wind Speed: {station['wind_speed']}")
@@ -475,8 +477,8 @@ def airports_menu():
     try:
 
         spinner = Halo(text='Filtering airports for API calls...', spinner='dots')
-        station_ids = [station['code'] for station in station_ids if station['include_in_api']]
-        if not station_ids:
+        station_data = [(station['code'], station['name']) for station in station_ids if station['include_in_api']]
+        if not station_data:
             spinner.fail("No airports are marked for API calls. Please set the third field to 'T' for the airports you want to include.")
             return None
         else:
@@ -484,7 +486,7 @@ def airports_menu():
 
         spinner = Halo(text='Getting airport weather data from NOAA...', spinner='dots')
         spinner.start()
-        station_weather = get_station_weather(station_ids)
+        station_weather = get_station_weather(station_data)
         spinner.succeed("Airport weather data fetched successfully.")
         print_station_forecasts(station_weather)
     except Exception as e:
