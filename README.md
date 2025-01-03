@@ -4,16 +4,24 @@ A Python command-line application that provides comprehensive weather informatio
 
 ## Features
 
-- **Current Weather Conditions**: Get detailed current weather including temperature, wind, and forecast
-- **Extended Forecast**: View 7-day weather forecast
-- **Hourly Forecast**: See detailed hourly weather predictions
-- **Nearby Stations**: Get weather data from up to 4 nearest weather stations
-- **Active Alerts**: View any active weather alerts for the location
-- **Address History**: Maintains a list of previously searched addresses
-- **Google Maps Integration**: Provides Google Maps links for locations
-- **Unit Conversions**: Automatically converts between metric and imperial units
-- **Airport Weather**: Get weather data for a specific airport
-- **File loading**: Load and save address history to a file; load airport codes from a file 
+- **Address Lookup**: Enter an address to get weather data
+   - **Current Weather Conditions**: Get detailed current weather including temperature, wind, and forecast
+   - **Extended Forecast**: View 7-day weather forecast
+   - **Hourly Forecast**: See detailed hourly weather predictions
+   - **Nearby Stations**: Get weather data from up to 4 nearest weather stations
+   - **Active Alerts**: View any active weather alerts for the location
+   - **Address History**: Maintains a list of previously searched addresses
+   - **Google Maps Integration**: Provides Google Maps links for locations
+   - **Unit Conversions**: Automatically converts between metric and imperial units
+   - **Airport Weather**: Get weather data for a specific airport
+   - **File loading**: Load and save address history to a file
+- **Airport Weather Lookup**
+   - **Load airport codes from a file**
+   - **Get weather data for a specific airports marked with T boolean in file** 
+- **Airport List Download and Random Weather Lookup**
+   - **Download airport codes from a [GitHub repository](https://davidmegginson.github.io/ourairports-data/airports.csv)**
+   - **Create random list of 5 airport codes**
+   - **Get weather data for a specific airports marked with T boolean in file** 
 
 ## Requirements
 
@@ -57,8 +65,9 @@ Follow the on-screen prompts to:
       - Active alerts
       - Change location
       - Return to main menu
-2. Get airport weather data
-3. Exit the application
+2. Get airport weather data from file
+3. Download airport codes and get weather data for random airports
+4. Exit the application
 
 
 ## API Keys

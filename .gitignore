@@ -2,4 +2,5 @@
 .env
 addresses.txt
 airports.txt
+airports_download.csv
 .vscode/
