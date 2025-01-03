@@ -6,6 +6,12 @@ from halo import Halo
 from datetime import datetime
 import pytz
 import os
+import pandas as pd
+import random
+import ssl
+import certifi
+import urllib.request
+import io
 
 ADDRESS_FILE = "addresses.txt"
 CENSUS_API_BASE_URL = "https://geocoding.geo.census.gov/geocoder/locations/onelineaddress"
@@ -339,78 +345,88 @@ def get_station_weather(station_data):
         station_payload = {'station_id': station_id}
         station_payload['labelled_name'] = name
 
-        # api call for station name and timezone
-        station_url = f"https://api.weather.gov/stations/{station_id}"
-        station_response = requests.get(station_url)
-        station_response.raise_for_status()
-        station_data = station_response.json()
+        try:
 
-        if station_data is not None:  
-            station_payload['station_id'] = station_id
-            station_payload['station_name'] = station_data['properties']['name']
-            station_payload['timezone'] = station_data['properties']['timeZone']
-            station_payload['latitude'] = station_data['geometry']['coordinates'][1]
-            station_payload['longitude'] = station_data['geometry']['coordinates'][0]
-        else:
-            print(f"Could not retrieve station data for station: {station_id}")
-        
-        # api call for station observation data
-        observation_url = f"https://api.weather.gov/stations/{station_id}/observations/latest"
-        observation_response = requests.get(observation_url)
-        observation_response.raise_for_status()
-        observation_data = observation_response.json()
+            # api call for station name and timezone
+            station_url = f"https://api.weather.gov/stations/{station_id}"
+            station_response = requests.get(station_url)
+            station_response.raise_for_status()
+            station_data = station_response.json()
 
-        if observation_data is not None:  
-            temperature = observation_data['properties']['temperature']
-            if temperature:
-                temperature = convert_temperature(temperature)
-                temperature_value = temperature['value']
-                temperature_unit = temperature['unitCode']
+            if station_data is not None:  
+                station_payload['station_id'] = station_id
+                station_payload['station_name'] = station_data['properties']['name']
+                station_payload['timezone'] = station_data['properties']['timeZone']
+                station_payload['latitude'] = station_data['geometry']['coordinates'][1]
+                station_payload['longitude'] = station_data['geometry']['coordinates'][0]
             else:
-                temperature_value = None
-                temperature_unit = None
+                print(f"Could not retrieve station data for station: {station_id}")
+                continue
+            
+            # api call for station observation data
+            observation_url = f"https://api.weather.gov/stations/{station_id}/observations/latest"
+            observation_response = requests.get(observation_url)
+            observation_response.raise_for_status()
+            observation_data = observation_response.json()
 
-            wind_speed = observation_data['properties']['windSpeed']
-            wind_speed_value = convert_kmh_to_mph(wind_speed['value'])
-            wind_speed_unit = "mph"  # Assuming mph is the target unit for conversion
+            if observation_data is not None:  
+                temperature = observation_data['properties']['temperature']
+                if temperature:
+                    temperature = convert_temperature(temperature)
+                    temperature_value = temperature['value']
+                    temperature_unit = temperature['unitCode']
+                else:
+                    temperature_value = None
+                    temperature_unit = None
 
-            wind_direction = observation_data['properties']['windDirection']
-            wind_direction_value = wind_direction['value'] if wind_direction else None
+                wind_speed = observation_data['properties']['windSpeed']
+                wind_speed_value = convert_kmh_to_mph(wind_speed['value'])
+                wind_speed_unit = "mph"  # Assuming mph is the target unit for conversion
 
-            current_conditions = observation_data['properties']['textDescription']
+                wind_direction = observation_data['properties']['windDirection']
+                wind_direction_value = wind_direction['value'] if wind_direction else None
 
-            address_map_url = generate_google_maps_url(station_payload['latitude'], station_payload['longitude'], "")
-            airports_url = generate_flightradar24_url(station_id)
+                current_conditions = observation_data['properties']['textDescription']
 
-            station_payload['address_map_url'] = address_map_url
-            station_payload['airports_url'] = airports_url
-            station_payload['temperature'] = f"{temperature_value}" if temperature_value is not None else None
-            station_payload['temperature_unit'] = temperature_unit
-            station_payload['wind_speed'] = f"{wind_speed_value} {wind_speed_unit}" if wind_speed_value is not None else None
-            station_payload['wind_direction'] = wind_direction_value
-            station_payload['current_conditions'] = current_conditions
-        else:
-            # Handle the case where observation data is None, e.g., by skipping the station
-            print(f"Could not retrieve observation data for station: {station_id}")
+                address_map_url = generate_google_maps_url(station_payload['latitude'], station_payload['longitude'], "")
+                airports_url = generate_flightradar24_url(station_id)
 
-        # api call for station forecast url
-        station_point_url = f"https://api.weather.gov/points/{station_payload['latitude']},{station_payload['longitude']}"
-        response = requests.get(station_point_url)
-        point_data = response.json()
-
-        if point_data is not None:
-            forecast_url = point_data['properties']['forecast']
-            forecast_response = requests.get(forecast_url)
-            forecast_data = forecast_response.json()
-            if forecast_data is not None:
-                station_payload['forecast'] = forecast_data['properties']['periods'][0]['detailedForecast']
+                station_payload['address_map_url'] = address_map_url
+                station_payload['airports_url'] = airports_url
+                station_payload['temperature'] = f"{temperature_value}" if temperature_value is not None else None
+                station_payload['temperature_unit'] = temperature_unit
+                station_payload['wind_speed'] = f"{wind_speed_value} {wind_speed_unit}" if wind_speed_value is not None else None
+                station_payload['wind_direction'] = wind_direction_value
+                station_payload['current_conditions'] = current_conditions
             else:
-                print(f"Could not retrieve forecast data for station: {station_id}")
-        else:
-            print(f"Could not retrieve point station data for station: {station_id}")
-        
-        station_weather.append(station_payload)
+                # Handle the case where observation data is None, e.g., by skipping the station
+                print(f"Could not retrieve observation data for station: {station_id}")
+                continue
 
+            # api call for station forecast url
+            station_point_url = f"https://api.weather.gov/points/{station_payload['latitude']},{station_payload['longitude']}"
+            response = requests.get(station_point_url)
+            point_data = response.json()
+
+            if point_data is not None:
+                forecast_url = point_data['properties']['forecast']
+                forecast_response = requests.get(forecast_url)
+                forecast_data = forecast_response.json()
+                if forecast_data is not None:
+                    station_payload['forecast'] = forecast_data['properties']['periods'][0]['detailedForecast']
+                else:
+                    print(f"Could not retrieve forecast data for station: {station_id}")
+            else:
+                print(f"Could not retrieve point station data for station: {station_id}")
+            
+            station_weather.append(station_payload)
+
+        except requests.exceptions.HTTPError as e:
+            print(f"Station not found or API error for {station_id}: {e}")
+            continue  # Skip to the next station
+        except Exception as e:
+            print(f"Unexpected error for station {station_id}: {e}")
+            continue  # Skip to the next station        
 
     return station_weather
 
@@ -673,6 +689,66 @@ def address_menu():
         else:
             print("Invalid choice. Please try again.")
 
+def airport_download():
+    """
+    download a list of airports
+    randomly pick 5 airports
+    call the get_station_weather function
+    """
+
+    spinner = Halo(text='Downloading airport data from NOAA...', spinner='dots')
+    try:
+        spinner.start()
+        airports_url = "https://davidmegginson.github.io/ourairports-data/airports.csv"
+
+        # Create an SSL context using certifi's CA bundle
+        ssl_context = ssl.create_default_context(cafile=certifi.where())
+
+        # Download the CSV file
+        with urllib.request.urlopen(airports_url, context=ssl_context) as response:
+            csv_content = response.read()
+            with open('airports_download.csv', 'wb') as file:
+                file.write(csv_content)
+            airports_df = pd.read_csv(io.StringIO(csv_content.decode('utf-8')))
+            filtered_airports_df = airports_df[
+                airports_df['ident'].str.startswith('K') &  # Starts with 'K' which is the prefix for US airports
+                (airports_df['ident'].str.len() == 4) &     # Has exactly 4 characters
+                (airports_df['ident'].str.isalpha())        # Contains only alphabetic characters
+        ]
+            filtered_airports_df.to_csv('airports_download.csv', index=False)
+        spinner.succeed("Airport data downloaded successfully.")
+
+    except Exception as e:
+        spinner.fail(f"Error downloading airport data: {e}")
+        return None
+    finally:
+        spinner.stop()
+
+    try:
+        spinner = Halo(text='Randomly pick 5 airports...', spinner='dots')
+        spinner.start()
+        random_airports = filtered_airports_df[['ident', 'name']].dropna().sample(n=5)
+        random_airports.rename(columns={'ident': 'station_id'}, inplace=True)
+    except Exception as e:
+        spinner.fail(f"Error randomizing airport data: {e}")
+        return None
+    finally:
+        spinner.stop()
+
+    try:
+        spinner = Halo(text='Getting airport weather data from NOAA...', spinner='dots')
+        spinner.start()
+        random_airports_tuples = list(zip(random_airports['station_id'], airports_df['name']))
+        station_weather = get_station_weather(random_airports_tuples)
+        spinner.succeed("Airport weather data fetched successfully.")
+        print_station_forecasts(station_weather)
+    except Exception as e:
+        spinner.fail(f"Error getting airport weather data: {e}")
+        return None
+    finally:
+        spinner.stop()
+
+
 def main():
 
     print("Welcome to the Weather App!")
@@ -681,7 +757,8 @@ def main():
         print("\nMain Menu:")
         print("1. Get specific address weather")
         print("2. Get airport weather")
-        print("3. Exit")
+        print("3. Download random airports & get weather")
+        print("4. Exit")
         choice = input("Enter your choice (1-3): ")        
         print("\n")
         if choice == '1':
@@ -689,6 +766,8 @@ def main():
         elif choice == '2':
             airports_menu()
         elif choice == '3':
+            airport_download()
+        elif choice == '4':
             print("\n Exiting the program... Goodbye!")
             break
         else:
