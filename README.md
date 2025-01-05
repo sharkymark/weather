@@ -19,9 +19,12 @@ A Python command-line application that provides comprehensive weather informatio
    - **Load airport codes from a file**
    - **Get weather data for a specific airports marked with T boolean in file** 
 - **Airport List Download and Random Weather Lookup**
-   - **Download airport codes from a [GitHub repository](https://davidmegginson.github.io/ourairports-data/airports.csv)**
-   - **Create random list of 5 airport codes**
-   - **Get weather data for a specific airports marked with T boolean in file** 
+   - **Download airport codes**: from a [GitHub repository](https://davidmegginson.github.io/ourairports-data/airports.csv)**
+   - **Create random list**: of 5 airport codes**
+   - **Get weather data**: for a specific airports marked with T boolean in file**
+- **Airport Filter**
+   - **Filter airports**: by code, name, state and municipality**
+   - **Download airport codes**: if not resident locally from a [GitHub repository](https://davidmegginson.github.io/ourairports-data/airports.csv)**
 
 ## Requirements
 
@@ -67,7 +70,8 @@ Follow the on-screen prompts to:
       - Return to main menu
 2. Get airport weather data from file
 3. Download airport codes and get weather data for random airports
-4. Exit the application
+4. Prompt user to filter airports by code, name, state and municipality
+5. Exit the application
 
 
 ## API Keys
@@ -80,12 +84,13 @@ This application uses:
 
 ```
 weather/
-├── weather.py          # Main application code
-├── README.md           # This documentation
-├── requirements.txt    # Python dependencies
-├── .gitignore          # Git ignore file
-└── addresses.txt       # Stores previously searched addresses
-└── airports.txt        # Stores airport codes for nearby stations
+├── weather.py             # Main application code
+├── README.md              # This documentation
+├── requirements.txt       # Python dependencies
+├── .gitignore             # Git ignore file
+└── addresses.txt          # Stores previously searched addresses
+└── airports.txt           # Stores airport codes for nearby stations
+└── airports_dowload.csv   # Stores airport codes for random weather lookup
 ```
 
 ## Contributing
