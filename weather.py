@@ -689,12 +689,89 @@ def address_menu():
         else:
             print("Invalid choice. Please try again.")
 
-def airport_download():
+def airport_search():
+    """Search airports by wildcard"""
+    # Check if airports_download.csv exists
+    if not os.path.exists('airports_download.csv'):
+        print("Airport database not found. Downloading...")
+        airport_download(print_results=False)
+    
+    # Load airport data
+    airports_df = pd.read_csv('airports_download.csv')
+    
+    # Get search term
+    search_term = input("\nEnter airport code, state, municipality, or name wildcard (use * for any characters): ").strip().upper()
+    
+    # Convert wildcard to regex
+    search_regex = search_term.replace('*', '.*')
+    
+    # Search both code, name, municipality, and state
+    matches = airports_df[
+        (airports_df['ident'].str.upper().str.contains(search_regex)) |
+        (airports_df['name'].str.upper().str.contains(search_regex)) |
+        (airports_df['municipality'].str.upper().str.contains(search_regex)) |
+        (airports_df['iso_region'].str.upper().str.contains(search_regex))
+    ]
+    
+    if matches.empty:
+        print("No matching airports found.")
+        return
+    
+    # Sort
+    matches = matches.sort_values(by=['iso_region', 'municipality', 'name'], ascending=True)
+
+    # Replace NaN values with "N/A" in the relevant columns
+    matches.fillna({
+        'ident': 'N/A',
+        'name': 'N/A',
+        'iso_region': 'N/A',
+        'municipality': 'N/A'
+    }, inplace=True)
+
+    # Display matches with numbers
+    print("\nMatching airports:")
+    for i, (_, row) in enumerate(matches.iterrows()):
+        print(f"{i+1}. {row['ident']} - {row['name']} ({row['iso_region']}, {row['municipality']})")
+    
+    # Let user select
+    while True:
+        try:
+            choice = input("\nEnter number to select airport (or 'q' to quit): ")
+            if choice.lower() == 'q':
+                return
+                
+            choice = int(choice)
+            if 1 <= choice <= len(matches):
+                selected = matches.iloc[choice-1]
+                station_id = selected['ident']
+                name = selected['name']
+                
+                # Get weather for selected airport
+                station_weather = get_station_weather([(station_id, name)])
+                print_station_forecasts(station_weather)
+                return
+                
+            print("Invalid choice. Please try again.")
+        except ValueError:
+            print("Please enter a valid number or 'q' to quit.")
+
+def airport_download(print_results=True):
     """
     download a list of airports
     randomly pick 5 airports
     call the get_station_weather function
     """
+
+    # ask user if they want to filter by scheduled flights
+# Ask the user if they want to filter by scheduled service
+    while True:
+        print("Do you want to filter by airports that provide scheduled service?")
+        filter_by_scheduled = input("Enter 1 for scheduled service, 2 for no: ").strip()
+        
+        if filter_by_scheduled in ['1', '2']:
+            break
+        else:
+            print("Invalid input. Please enter 1 or 2.")
 
     spinner = Halo(text='Downloading airport data from NOAA...', spinner='dots')
     try:
@@ -710,11 +787,20 @@ def airport_download():
             with open('airports_download.csv', 'wb') as file:
                 file.write(csv_content)
             airports_df = pd.read_csv(io.StringIO(csv_content.decode('utf-8')))
+
+
             filtered_airports_df = airports_df[
-                airports_df['ident'].str.startswith('K') &  # Starts with 'K' which is the prefix for US airports
+                (airports_df['ident'].str.startswith('K') |  # Contiguous US airports
+                airports_df['ident'].str.startswith('P') |  # Pacific region (Hawaii, Alaska, Guam, etc.)
+                airports_df['ident'].str.startswith('T')) &  # Starts with 'K' which is the prefix for US airports
                 (airports_df['ident'].str.len() == 4) &     # Has exactly 4 characters
                 (airports_df['ident'].str.isalpha())        # Contains only alphabetic characters
         ]
+            
+            # Apply additional filter for scheduled service if the user selected option 1
+            if filter_by_scheduled == '1':
+                filtered_airports_df = filtered_airports_df[filtered_airports_df['scheduled_service'] == 'yes']
+
             filtered_airports_df.to_csv('airports_download.csv', index=False)
         spinner.succeed("Airport data downloaded successfully.")
 
@@ -724,29 +810,31 @@ def airport_download():
     finally:
         spinner.stop()
 
-    try:
-        spinner = Halo(text='Randomly pick 5 airports...', spinner='dots')
-        spinner.start()
-        random_airports = filtered_airports_df[['ident', 'name']].dropna().sample(n=5)
-        random_airports.rename(columns={'ident': 'station_id'}, inplace=True)
-    except Exception as e:
-        spinner.fail(f"Error randomizing airport data: {e}")
-        return None
-    finally:
-        spinner.stop()
+    if print_results:
 
-    try:
-        spinner = Halo(text='Getting airport weather data from NOAA...', spinner='dots')
-        spinner.start()
-        random_airports_tuples = list(zip(random_airports['station_id'], airports_df['name']))
-        station_weather = get_station_weather(random_airports_tuples)
-        spinner.succeed("Airport weather data fetched successfully.")
-        print_station_forecasts(station_weather)
-    except Exception as e:
-        spinner.fail(f"Error getting airport weather data: {e}")
-        return None
-    finally:
-        spinner.stop()
+        try:
+            spinner = Halo(text='Randomly pick 5 airports...', spinner='dots')
+            spinner.start()
+            random_airports = filtered_airports_df[['ident', 'name']].dropna().sample(n=5)
+            random_airports.rename(columns={'ident': 'station_id'}, inplace=True)
+        except Exception as e:
+            spinner.fail(f"Error randomizing airport data: {e}")
+            return None
+        finally:
+            spinner.stop()
+
+        try:
+            spinner = Halo(text='Getting airport weather data from NOAA...', spinner='dots')
+            spinner.start()
+            random_airports_tuples = list(zip(random_airports['station_id'], airports_df['name']))
+            station_weather = get_station_weather(random_airports_tuples)
+            spinner.succeed("Airport weather data fetched successfully.")
+            print_station_forecasts(station_weather)
+        except Exception as e:
+            spinner.fail(f"Error getting airport weather data: {e}")
+            return None
+        finally:
+            spinner.stop()
 
 
 def main():
@@ -758,16 +846,19 @@ def main():
         print("1. Get specific address weather")
         print("2. Get airport weather")
         print("3. Download random airports & get weather")
-        print("4. Exit")
-        choice = input("Enter your choice (1-3): ")        
+        print("4. Search airports")
+        print("5. Exit")
+        choice = input("Enter your choice (1-4): ")
         print("\n")
         if choice == '1':
             address_menu()
         elif choice == '2':
             airports_menu()
         elif choice == '3':
-            airport_download()
+            airport_download(print_results=True)
         elif choice == '4':
+            airport_search()
+        elif choice == '5':
             print("\n Exiting the program... Goodbye!")
             break
         else:
