@@ -12,6 +12,8 @@ import ssl
 import certifi
 import urllib.request
 import io
+import webbrowser
+import subprocess
 
 ADDRESS_FILE = "addresses.txt"
 CENSUS_API_BASE_URL = "https://geocoding.geo.census.gov/geocoder/locations/onelineaddress"
@@ -430,13 +432,11 @@ def get_station_weather(station_data):
 
     return station_weather
 
-def print_station_forecasts(station_weather):
-
+def print_station_forecasts(station_weather, browser=False):
     if station_weather:
         print("\n\nAirport Weather Conditions:\n")
             
         for station in station_weather:
-
             print("-" * 20)
             print(f"Station ID: {station['station_id']}")
             print(f"Labeled as: {station['labelled_name']}")
@@ -454,12 +454,21 @@ def print_station_forecasts(station_weather):
             print(f"https://forecast.weather.gov/MapClick.php?lat={station['latitude']}&lon={station['longitude']}")
             print("\n")
 
+            if browser:
+                chrome_path = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+                webbrowser.register('chrome', None, webbrowser.BackgroundBrowser(chrome_path))
+
+                chrome = webbrowser.get('chrome')
+                if chrome:
+                    subprocess.run([chrome_path, station['airports_url']], stdout=subprocess.DEVNULL)
+                    subprocess.run([chrome_path, station['address_map_url']], stdout=subprocess.DEVNULL)
+
 
 
     else:
         print("Failed to retrieve weather for airports.")
 
-def airports_menu():
+def airports_menu(args):
     
     try:
         spinner = Halo(text='Reading airport data from file...', spinner='dots')
@@ -504,7 +513,7 @@ def airports_menu():
         spinner.start()
         station_weather = get_station_weather(station_data)
         spinner.succeed("Airport weather data fetched successfully.")
-        print_station_forecasts(station_weather)
+        print_station_forecasts(station_weather, browser=args.browser)
     except Exception as e:
         spinner.fail(f"Error getting airport weather data: {e}")
         return None
@@ -689,7 +698,7 @@ def address_menu():
         else:
             print("Invalid choice. Please try again.")
 
-def airport_search():
+def airport_search(args):
     """Search airports by wildcard"""
     # Check if airports_download.csv exists
     if not os.path.exists('airports_download.csv'):
@@ -748,7 +757,7 @@ def airport_search():
                 
                 # Get weather for selected airport
                 station_weather = get_station_weather([(station_id, name)])
-                print_station_forecasts(station_weather)
+                print_station_forecasts(station_weather, browser=args.browser)
                 
                 # After showing weather, give options
                 while True:
@@ -774,7 +783,7 @@ def airport_search():
         except ValueError:
             print("Please enter a valid number or 'q' to quit.")
 
-def airport_download(print_results=True):
+def airport_download(args, print_results=True):
     """
     download a list of airports
     randomly pick 5 airports
@@ -848,7 +857,7 @@ def airport_download(print_results=True):
             random_airports_tuples = list(zip(random_airports['station_id'], airports_df['name']))
             station_weather = get_station_weather(random_airports_tuples)
             spinner.succeed("Airport weather data fetched successfully.")
-            print_station_forecasts(station_weather)
+            print_station_forecasts(station_weather, browser=args.browser)
         except Exception as e:
             spinner.fail(f"Error getting airport weather data: {e}")
             return None
@@ -857,6 +866,12 @@ def airport_download(print_results=True):
 
 
 def main():
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="Weather App using US Census & NOAA APIs")
+    parser.add_argument('--browser', action='store_true',
+                       help='Open weather station URLs in Chrome browser')
+    args = parser.parse_args()
 
     print("Welcome to the Weather App!")
     print("This app uses the US Census & NOAA APIs")
@@ -871,13 +886,13 @@ def main():
         choice = input("Enter your choice (1-5): ")
         print("\n")
         if choice == '1':
-            address_menu()
+            address_menu(args)
         elif choice == '2':
-            airports_menu()
+            airports_menu(args)
         elif choice == '3':
-            airport_download(print_results=True)
+            airport_download(args, print_results=True)
         elif choice == '4':
-            airport_search()
+            airport_search(args)
         elif choice == '5':
             print("\n Exiting the program... Goodbye!")
             break

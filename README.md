@@ -25,6 +25,8 @@ A Python command-line application that provides comprehensive weather informatio
 - **Airport Filter**
    - **Filter airports**: by code, name, state and municipality**
    - **Download airport codes**: if not resident locally from a [GitHub repository](https://davidmegginson.github.io/ourairports-data/airports.csv)**
+- **Open Chrome browser**: to view Google Maps location and FlightTrader24 of airport
+   - **Optional**: to enable this feature, pass `python3 weather.py --browser` flag when starting the app
 
 ## Requirements
 
