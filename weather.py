@@ -841,9 +841,9 @@ def airport_download(args, print_results=True):
     if print_results:
 
         try:
-            spinner = Halo(text='Randomly pick 5 airports...', spinner='dots')
+            spinner = Halo(text='Randomly pick 2 airports...', spinner='dots')
             spinner.start()
-            random_airports = filtered_airports_df[['ident', 'name']].dropna().sample(n=5)
+            random_airports = filtered_airports_df[['ident', 'name']].dropna().sample(n=2)
             random_airports.rename(columns={'ident': 'station_id'}, inplace=True)
         except Exception as e:
             spinner.fail(f"Error randomizing airport data: {e}")
