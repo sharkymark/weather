@@ -20,7 +20,7 @@ A Python command-line application that provides comprehensive weather informatio
    - **Get weather data for a specific airports marked with T boolean in file** 
 - **Airport List Download and Random Weather Lookup**
    - **Download airport codes**: from a [GitHub repository](https://davidmegginson.github.io/ourairports-data/airports.csv)**
-   - **Create random list**: of 5 airport codes**
+   - **Create random list**: of 2 airport codes**
    - **Get weather data**: for a specific airports marked with T boolean in file**
 - **Airport Filter**
    - **Filter airports**: by code, name, state and municipality**
