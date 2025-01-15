@@ -728,13 +728,13 @@ def airport_search():
         'municipality': 'N/A'
     }, inplace=True)
 
-    # Display matches with numbers
-    print("\nMatching airports:")
-    for i, (_, row) in enumerate(matches.iterrows()):
-        print(f"{i+1}. {row['ident']} - {row['name']} ({row['iso_region']}, {row['municipality']})")
-    
     # Let user select
     while True:
+        # Display matches with numbers
+        print("\nMatching airports:")
+        for i, (_, row) in enumerate(matches.iterrows()):
+            print(f"{i+1}. {row['ident']} - {row['name']} ({row['iso_region']}, {row['municipality']})")
+        
         try:
             choice = input("\nEnter number to select airport (or 'q' to quit): ")
             if choice.lower() == 'q':
@@ -749,7 +749,26 @@ def airport_search():
                 # Get weather for selected airport
                 station_weather = get_station_weather([(station_id, name)])
                 print_station_forecasts(station_weather)
-                return
+                
+                # After showing weather, give options
+                while True:
+                    print("\nOptions:")
+                    print("1. Select another airport from this list")
+                    print("2. Search again")
+                    print("3. Return to main menu")
+                    choice = input("Enter your choice: ")
+                    
+                    if choice == '1':
+                        break  # Break out of options menu to show airport list again
+                    elif choice == '2':
+                        return airport_search()  # Start new search
+                    elif choice == '3':
+                        return  # Return to main menu
+                    else:
+                        print("Invalid choice. Please try again.")
+                
+                # If we broke out of options menu with choice 1, continue outer loop
+                continue
                 
             print("Invalid choice. Please try again.")
         except ValueError:
@@ -840,6 +859,7 @@ def airport_download(print_results=True):
 def main():
 
     print("Welcome to the Weather App!")
+    print("This app uses the US Census & NOAA APIs")
 
     while True:
         print("\nMain Menu:")
@@ -848,7 +868,7 @@ def main():
         print("3. Download random airports & get weather")
         print("4. Search airports")
         print("5. Exit")
-        choice = input("Enter your choice (1-4): ")
+        choice = input("Enter your choice (1-5): ")
         print("\n")
         if choice == '1':
             address_menu()
@@ -862,7 +882,7 @@ def main():
             print("\n Exiting the program... Goodbye!")
             break
         else:
-            print("Invalid choice. Please enter a number between 1 and 3.")
+            print("Invalid choice. Please enter a number between 1 and 5.")
 
 
 
