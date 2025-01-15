@@ -770,7 +770,7 @@ def airport_search(args):
                     if choice == '1':
                         break  # Break out of options menu to show airport list again
                     elif choice == '2':
-                        return airport_search()  # Start new search
+                        return airport_search(args)  # Start new search
                     elif choice == '3':
                         return  # Return to main menu
                     else:
