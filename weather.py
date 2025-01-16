@@ -83,7 +83,7 @@ def generate_google_maps_url(latitude, longitude, label):
     if label == "":
         return f"https://www.google.com/maps/search/{latitude},{longitude}/{latitude},{longitude},15z?t=s"
     else:
-        return f"https://www.google.com/maps/search/?api=1&query={quote(label)}@{latitude},{longitude}"
+        return f"https://www.google.com/maps/place/{quote(label)}"
 
 
 def generate_flightradar24_url(station_id):
@@ -460,9 +460,9 @@ def print_station_forecasts(station_weather, browser=False):
 
                 chrome = webbrowser.get('chrome')
                 if chrome:
+                    subprocess.run([chrome_path, f"https://forecast.weather.gov/MapClick.php?lat={station['latitude']}&lon={station['longitude']}"], stdout=subprocess.DEVNULL)                    
                     subprocess.run([chrome_path, station['airports_url']], stdout=subprocess.DEVNULL)
                     subprocess.run([chrome_path, station['address_map_url']], stdout=subprocess.DEVNULL)
-                    subprocess.run([chrome_path, f"https://forecast.weather.gov/MapClick.php?lat={station['latitude']}&lon={station['longitude']}"], stdout=subprocess.DEVNULL)
 
 
 
@@ -560,11 +560,11 @@ def address_menu(args):
     address_map_url = generate_google_maps_url(latitude, longitude, matched_address)
     print(f"\nGoogle Maps URL for address: {address_map_url}")
 
-    print("\nGetting current weather conditions...")
+    print("\nGetting forecasted weather conditions...")
     conditions = get_short_conditions(latitude, longitude)
     if conditions:
-        print(f"\nTemperature: {conditions['temperature']} {conditions['temperatureUnit']}")
-        print(f"Forecast: {conditions['shortForecast']}")
+        print(f"\nHigh Temperature: {conditions['temperature']} {conditions['temperatureUnit']}")
+        print(f"Forecasted conditions: {conditions['shortForecast']}")
     else:
         print("\nFailed to retrieve weather conditions.")
     
@@ -577,8 +577,9 @@ def address_menu(args):
 
         chrome = webbrowser.get('chrome')
         if chrome:
-            subprocess.run([chrome_path, address_map_url], stdout=subprocess.DEVNULL)
             subprocess.run([chrome_path, f"https://forecast.weather.gov/MapClick.php?lat={latitude}&lon={longitude}"], stdout=subprocess.DEVNULL)
+            subprocess.run([chrome_path, address_map_url], stdout=subprocess.DEVNULL)
+
 
     while True:
         print("\nOptions:")
@@ -687,13 +688,25 @@ def address_menu(args):
             address_map_url = generate_google_maps_url(latitude, longitude, matched_address)
             print(f"\nGoogle Maps URL for address: {address_map_url}")
 
-            print("\nGetting current weather conditions...")
+            print("\nGetting forecasted weather conditions...")
             conditions = get_short_conditions(latitude, longitude)
             if conditions:
-                print(f"\nTemperature: {conditions['temperature']} {conditions['temperatureUnit']}")
-                print(f"Forecast: {conditions['shortForecast']}")
+                print(f"\nHigh Temperature: {conditions['temperature']} {conditions['temperatureUnit']}")
+                print(f"Forecasted Conditions: {conditions['shortForecast']}")
             else:
                 print("\nFailed to retrieve weather conditions.")
+
+            if args.browser:
+                chrome_path = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+                webbrowser.register('chrome', None, webbrowser.BackgroundBrowser(chrome_path))
+
+                chrome = webbrowser.get('chrome')
+                if chrome:
+                    subprocess.run([chrome_path, f"https://forecast.weather.gov/MapClick.php?lat={latitude}&lon={longitude}"], stdout=subprocess.DEVNULL)
+                    subprocess.run([chrome_path, address_map_url], stdout=subprocess.DEVNULL)
+
+
+
 
         elif choice == '5':
             print("Getting active weather alerts...")
