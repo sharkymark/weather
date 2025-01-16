@@ -520,7 +520,7 @@ def airports_menu(args):
     finally:
         spinner.stop()
 
-def address_menu():
+def address_menu(args):
 
     stored_addresses = load_addresses()
 
