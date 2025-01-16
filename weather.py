@@ -571,6 +571,15 @@ def address_menu(args):
     print("\nNOAA forecast webpage for this location:")
     print(f"https://forecast.weather.gov/MapClick.php?lat={latitude}&lon={longitude}")
 
+    if args.browser:
+        chrome_path = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+        webbrowser.register('chrome', None, webbrowser.BackgroundBrowser(chrome_path))
+
+        chrome = webbrowser.get('chrome')
+        if chrome:
+            subprocess.run([chrome_path, address_map_url], stdout=subprocess.DEVNULL)
+            subprocess.run([chrome_path, f"https://forecast.weather.gov/MapClick.php?lat={latitude}&lon={longitude}"], stdout=subprocess.DEVNULL)
+
     while True:
         print("\nOptions:")
         print("1. Get Detailed Conditions")
@@ -634,6 +643,15 @@ def address_menu(args):
                     print(f"Wind Direction: {station['wind_direction']}")
                     print(f"Google Maps URL for station: {station['address_map_url']}")
                     print("-" * 20)
+
+                    if args.browser:
+                        chrome_path = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+                        webbrowser.register('chrome', None, webbrowser.BackgroundBrowser(chrome_path))
+
+                        chrome = webbrowser.get('chrome')
+                        if chrome:
+                            subprocess.run([chrome_path, station['address_map_url']], stdout=subprocess.DEVNULL)
+
 
             else:
                 print("Failed to retrieve weather for nearest stations.")
