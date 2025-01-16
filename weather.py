@@ -462,6 +462,7 @@ def print_station_forecasts(station_weather, browser=False):
                 if chrome:
                     subprocess.run([chrome_path, station['airports_url']], stdout=subprocess.DEVNULL)
                     subprocess.run([chrome_path, station['address_map_url']], stdout=subprocess.DEVNULL)
+                    subprocess.run([chrome_path, f"https://forecast.weather.gov/MapClick.php?lat={station['latitude']}&lon={station['longitude']}"], stdout=subprocess.DEVNULL)
 
 
 
