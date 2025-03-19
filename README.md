@@ -12,6 +12,7 @@ A Python command-line application that provides comprehensive weather informatio
    - **Active Alerts**: View any active weather alerts for the location
    - **Address History**: Maintains a list of previously searched addresses
    - **Google Maps Integration**: Provides Google Maps links for locations
+   - **Zillow URL Integration**: Provides Zillow link to zip code of address
    - **Unit Conversions**: Automatically converts between metric and imperial units
    - **Airport Weather**: Get weather data for a specific airport
    - **File loading**: Load and save address history to a file
@@ -24,8 +25,9 @@ A Python command-line application that provides comprehensive weather informatio
    - **Get weather data**: for a specific airports marked with T boolean in file**
 - **Airport Filter**
    - **Filter airports**: by code, name, state and municipality**
+   - **Zillow URL Integration**: Provides Zillow link to city, county and state of airport   
    - **Download airport codes**: if not resident locally from a [GitHub repository](https://davidmegginson.github.io/ourairports-data/airports.csv)**
-- **Open Chrome browser**: to view Google Maps location and FlightTrader24 of airport
+- **Open Chrome browser**: to view Google Maps location, Zillow, and FlightTrader24 of airport
    - **Optional**: to enable this feature, pass `python3 weather.py --browser` flag when starting the app
 
 ## Requirements

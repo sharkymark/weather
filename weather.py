@@ -1,6 +1,5 @@
 import requests
 import json
-from geopy.distance import geodesic
 from urllib.parse import quote
 from halo import Halo
 from datetime import datetime
@@ -85,6 +84,67 @@ def generate_google_maps_url(latitude, longitude, label):
     else:
         return f"https://www.google.com/maps/place/{quote(label)}"
 
+
+def get_county_state_from_latlon(latitude, longitude):
+    """
+    Gets county and state from latitude and longitude using FCC API.
+    
+    Args:
+        latitude: The latitude of the location.
+        longitude: The longitude of the location.
+        
+    Returns:
+        county and state as string or None if not found.
+    """
+    try:
+        url = f"https://geo.fcc.gov/api/census/block/find?latitude={latitude}&longitude={longitude}&format=json"
+        response = requests.get(url)
+        response.raise_for_status()
+        data = response.json()
+        return data['County']['name']+ "-" +data['State']['name']
+    except Exception as e:
+        print(f"Error getting county and state: {e}")
+        return None
+
+def get_city_state_from_latlon(latitude, longitude):
+    """
+    Gets city from latitude and longitude using US Census API.
+    
+    Args:
+        latitude: The latitude of the location.
+        longitude: The longitude of the location.
+        
+    Returns:
+        city and state as string or None if not found.
+    """
+    try:
+        url = f"https://geocoding.geo.census.gov/geocoder/geographies/coordinates?x={longitude}&y={latitude}&benchmark=Public_AR_Current&vintage=Current_Current&format=json"
+        response = requests.get(url)
+        response.raise_for_status()
+        data = response.json()
+        city = data['result']['geographies']['Incorporated Places'][0]['BASENAME']
+        state = data['result']['geographies']['States'][0]['BASENAME']
+        if city and state:  # Check if city and state are not empty
+            return city + "-" + state
+        else:
+            print("No city and state found for these coordinates")
+            return None
+    except Exception as e:
+        print(f"Error getting city state info from US Census reverse lookup: {e}")
+        return None
+
+def generate_zillow_urls(arg):
+    """
+    Generates Zillow URLs for sale and rent listings.
+    
+    Args:
+        county+state or city+state: to search.
+        
+    Returns:
+        Tuple of (sale_url, rent_url)
+    """
+    zillow_url = f"https://www.zillow.com/homes/for_sale/{arg}"
+    return zillow_url
 
 def generate_flightradar24_url(station_id):
     """
@@ -432,6 +492,36 @@ def get_station_weather(station_data):
 
     return station_weather
 
+def print_zillow(lat,lon, browser):
+    
+    # Get county and state and generate Zillow URL
+    county_state = get_county_state_from_latlon(lat, lon)
+    if county_state:
+        zillow_county_state_url = generate_zillow_urls(county_state)
+        print(f"\nZillow URL for {county_state}:")
+        print(f"{zillow_county_state_url}")
+        
+        if browser:
+            chrome_path = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+            webbrowser.register('chrome', None, webbrowser.BackgroundBrowser(chrome_path))
+            chrome = webbrowser.get('chrome')
+            if chrome:
+                subprocess.run([chrome_path, zillow_county_state_url], stdout=subprocess.DEVNULL)
+
+    # Get city and state and generate Zillow URL
+    city_state = get_city_state_from_latlon(lat, lon)
+    if city_state:
+        zillow_city_state_url = generate_zillow_urls(city_state)
+        print(f"\nZillow URL for {city_state}:")
+        print(f"{zillow_city_state_url}")
+        
+        if browser:
+            chrome_path = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+            webbrowser.register('chrome', None, webbrowser.BackgroundBrowser(chrome_path))
+            chrome = webbrowser.get('chrome')
+            if chrome:
+                subprocess.run([chrome_path, zillow_city_state_url], stdout=subprocess.DEVNULL) 
+
 def print_station_forecasts(station_weather, browser=False):
     if station_weather:
         print("\n\nAirport Weather Conditions:\n")
@@ -447,6 +537,7 @@ def print_station_forecasts(station_weather, browser=False):
             print("\n")
             print(f"{station['address_map_url']}")
             print(f"{station['airports_url']}")
+            print_zillow(station['latitude'],station['longitude'],browser)
             print("\n")
             print(f"Current Conditions: {station['current_conditions']}")
             print(f"Forecast: {station['forecast']}")
@@ -560,6 +651,11 @@ def address_menu(args):
     address_map_url = generate_google_maps_url(latitude, longitude, matched_address)
     print(f"\nGoogle Maps URL for address: {address_map_url}")
 
+
+    zip_code = matched_address.split(",")[-1].strip()
+    zillow_url = generate_zillow_urls(zip_code)
+    print(f"\nZillow URL: {zillow_url}")
+
     print("\nGetting forecasted weather conditions...")
     conditions = get_short_conditions(latitude, longitude)
     if conditions:
@@ -579,6 +675,7 @@ def address_menu(args):
         if chrome:
             subprocess.run([chrome_path, f"https://forecast.weather.gov/MapClick.php?lat={latitude}&lon={longitude}"], stdout=subprocess.DEVNULL)
             subprocess.run([chrome_path, address_map_url], stdout=subprocess.DEVNULL)
+            subprocess.run([chrome_path, zillow_url], stdout=subprocess.DEVNULL)
 
 
     while True:
@@ -688,6 +785,10 @@ def address_menu(args):
             address_map_url = generate_google_maps_url(latitude, longitude, matched_address)
             print(f"\nGoogle Maps URL for address: {address_map_url}")
 
+            zip_code = matched_address.split(",")[-1].strip()
+            zillow_url = generate_zillow_urls(zip_code)
+            print(f"\nZillow URL: {zillow_url}")
+
             print("\nGetting forecasted weather conditions...")
             conditions = get_short_conditions(latitude, longitude)
             if conditions:
@@ -704,6 +805,7 @@ def address_menu(args):
                 if chrome:
                     subprocess.run([chrome_path, f"https://forecast.weather.gov/MapClick.php?lat={latitude}&lon={longitude}"], stdout=subprocess.DEVNULL)
                     subprocess.run([chrome_path, address_map_url], stdout=subprocess.DEVNULL)
+                    subprocess.run([chrome_path, zillow_url], stdout=subprocess.DEVNULL)
 
 
 
