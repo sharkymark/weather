@@ -96,15 +96,20 @@ def get_county_state_from_latlon(latitude, longitude):
     Returns:
         county and state as string or None if not found.
     """
+    spinner = Halo(text='Reverse geocoding lat lon for county and state...', spinner='dots')
     try:
+        spinner.start()
         url = f"https://geo.fcc.gov/api/census/block/find?latitude={latitude}&longitude={longitude}&format=json"
         response = requests.get(url)
         response.raise_for_status()
         data = response.json()
+        spinner.succeed("County and state received successfully")
         return data['County']['name']+ "-" +data['State']['name']
     except Exception as e:
-        print(f"Error getting county and state: {e}")
+        spinner.fail(f"Error getting county and state: {e}")
         return None
+    finally:
+        spinner.stop()
 
 def get_city_state_from_latlon(latitude, longitude):
     """
@@ -116,22 +121,52 @@ def get_city_state_from_latlon(latitude, longitude):
         
     Returns:
         city and state as string or None if not found.
+    
+    Example:
+    https://geocoding.geo.census.gov/geocoder/geographies/coordinates?x=-156.05056&y=19.74083&benchmark=Public_AR_Current&vintage=Current_Current&format=json
+    
     """
+    spinner = Halo(text='Reverse geocoding lat lon for city and state...', spinner='dots')
     try:
+        spinner.start()
         url = f"https://geocoding.geo.census.gov/geocoder/geographies/coordinates?x={longitude}&y={latitude}&benchmark=Public_AR_Current&vintage=Current_Current&format=json"
         response = requests.get(url)
         response.raise_for_status()
         data = response.json()
-        city = data['result']['geographies']['Incorporated Places'][0]['BASENAME']
-        state = data['result']['geographies']['States'][0]['BASENAME']
+        try:
+            city = data['result']['geographies']['Incorporated Places'][0]['BASENAME']
+        except (KeyError, IndexError):
+            city = None
+        try:
+            state = data['result']['geographies']['States'][0]['BASENAME']
+        except (KeyError, IndexError):
+            state = None
+        try:
+            city_state = data['result']['geographies']['Urban Areas'][0]['BASENAME']
+        except (KeyError, IndexError):
+            city_state = None
+        try:
+            county_city = data['result']['geographies']['County Subdivisions'][0]['BASENAME']
+        except (KeyError, IndexError):
+            county_city = None            
+        
+        if city_state:
+            spinner.succeed("City and state received successfully")
+            return city_state
         if city and state:  # Check if city and state are not empty
+            spinner.succeed("City and state received successfully")
             return city + "-" + state
+        if county_city:
+            spinner.succeed("City and state received successfully")
+            return county_city + "-" + state
         else:
-            print("No city and state found for these coordinates")
+            spinner.fail("No city and state found for these coordinates")
             return None
     except Exception as e:
-        print(f"Error getting city state info from US Census reverse lookup: {e}")
+        spinner.fail(f"Error getting city and state: {e}")
         return None
+    finally:
+        spinner.stop()
 
 def generate_zillow_urls(arg):
     """
