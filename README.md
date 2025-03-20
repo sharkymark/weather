@@ -61,6 +61,11 @@ Run the application:
 python weather.py
 ```
 
+To automatically open a Chrome web browser for weather, Google Maps, Flight, Zillow links:
+```bash
+python weather.py --browser
+```
+
 Follow the on-screen prompts to:
 1. Enter an address or select from previous addresses
    1. View current weather conditions
