@@ -13,6 +13,7 @@ import urllib.request
 import io
 import webbrowser
 import subprocess
+from urllib.parse import quote_plus
 
 ADDRESS_FILE = "addresses.txt"
 CENSUS_API_BASE_URL = "https://geocoding.geo.census.gov/geocoder/locations/onelineaddress"
@@ -178,7 +179,8 @@ def generate_zillow_urls(arg):
     Returns:
         Tuple of (sale_url, rent_url)
     """
-    zillow_url = f"https://www.zillow.com/homes/for_sale/{arg}"
+    encoded_arg = quote_plus(arg)
+    zillow_url = f"https://www.zillow.com/homes/for_sale/{encoded_arg}"
     return zillow_url
 
 def generate_flightradar24_url(station_id):
