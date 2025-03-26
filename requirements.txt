@@ -3,7 +3,6 @@ geopy
 halo
 datetime
 pytz
-aider-chat
 pandas
 lxml
 certifi

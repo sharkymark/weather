@@ -545,6 +545,7 @@ def print_zillow(lat,lon, browser):
             if chrome:
                 subprocess.run([chrome_path, zillow_county_state_url], stdout=subprocess.DEVNULL)
 
+    '''
     # Get city and state and generate Zillow URL
     city_state = get_city_state_from_latlon(lat, lon)
     if city_state:
@@ -558,6 +559,7 @@ def print_zillow(lat,lon, browser):
             chrome = webbrowser.get('chrome')
             if chrome:
                 subprocess.run([chrome_path, zillow_city_state_url], stdout=subprocess.DEVNULL) 
+    '''
 
 def print_station_forecasts(station_weather, browser=False):
     if station_weather:
@@ -574,13 +576,13 @@ def print_station_forecasts(station_weather, browser=False):
             print("\n")
             print(f"{station['address_map_url']}")
             print(f"{station['airports_url']}")
-            print_zillow(station['latitude'],station['longitude'],browser)
             print("\n")
             print(f"Current Conditions: {station['current_conditions']}")
             print(f"Forecast: {station['forecast']}")
             print("\n")
             print(f"https://forecast.weather.gov/MapClick.php?lat={station['latitude']}&lon={station['longitude']}")
             print("\n")
+        
 
             if browser:
                 chrome_path = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
@@ -592,6 +594,7 @@ def print_station_forecasts(station_weather, browser=False):
                     subprocess.run([chrome_path, station['airports_url']], stdout=subprocess.DEVNULL)
                     subprocess.run([chrome_path, station['address_map_url']], stdout=subprocess.DEVNULL)
 
+            print_zillow(station['latitude'],station['longitude'],browser)    
 
 
     else:

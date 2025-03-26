@@ -25,7 +25,7 @@ A Python command-line application that provides comprehensive weather informatio
    - **Get weather data**: for a specific airports marked with T boolean in file**
 - **Airport Filter**
    - **Filter airports**: by code, name, state and municipality**
-   - **Zillow URL Integration**: Provides Zillow link to city, county and state of airport   
+   - **Zillow URL Integration**: Provides Zillow link to county and state of airport   
    - **Download airport codes**: if not resident locally from a [GitHub repository](https://davidmegginson.github.io/ourairports-data/airports.csv)**
 - **Open Chrome browser**: to view Google Maps location, Zillow, and FlightTrader24 of airport
    - **Optional**: to enable this feature, pass `python3 weather.py --browser` flag when starting the app
