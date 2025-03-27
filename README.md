@@ -82,6 +82,18 @@ Follow the on-screen prompts to:
 4. Prompt user to filter airports by code, name, state and municipality
 5. Exit the application
 
+## Environment Variables
+
+- `CENSUS_API_KEY` (optional): API key for the US Census Geocoder API. If provided, it will be used for geocoding requests to improve reliability and avoid rate limits. Set this variable in your environment before running the application.
+
+### Example
+
+```bash
+export CENSUS_API_KEY=your_api_key_here
+python weather.py
+```
+
+If the API key is not set, the application will notify you and proceed without it.
 
 ## API Keys
 

@@ -4,6 +4,9 @@
         "dockerfile": "Dockerfile",
         "context": ".."
     },
+    "containerEnv": {
+        "CENSUS_API_KEY": "${localEnv:CENSUS_API_KEY}"
+      },    
     "customizations": {
         "vscode": {
             "extensions": [

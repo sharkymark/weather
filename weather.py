@@ -17,6 +17,14 @@ from urllib.parse import quote_plus
 
 ADDRESS_FILE = "addresses.txt"
 CENSUS_API_BASE_URL = "https://geocoding.geo.census.gov/geocoder/locations/onelineaddress"
+CENSUS_API_KEY = os.getenv("CENSUS_API_KEY")
+
+def notify_api_key_status():
+    """Notify if a US Census API key is found."""
+    if CENSUS_API_KEY:
+        print("\nUS Census API key found and will be used for geocoding API calls.")
+    else:
+        print("\nNo Census API key found. Geocoding will proceed without it and with rate limits.")
 
 def load_addresses():
     """Loads previously entered addresses from a file."""
@@ -50,6 +58,9 @@ def geocode_address(address):
         "benchmark": "Public_AR_Current",
         "format": "json",
     }
+    if CENSUS_API_KEY:
+        params["key"] = CENSUS_API_KEY
+
     spinner = Halo(text='Geocoding address...', spinner='dots')
     try:
         spinner.start()
@@ -448,8 +459,9 @@ def get_station_weather(station_data):
         station_payload = {'station_id': station_id}
         station_payload['labelled_name'] = name
 
+        spinner = Halo(text=f'Fetching weather station data from NOAA API...', spinner='dots')
         try:
-
+            spinner.start()
             # api call for station name and timezone
             station_url = f"https://api.weather.gov/stations/{station_id}"
             station_response = requests.get(station_url)
@@ -462,10 +474,14 @@ def get_station_weather(station_data):
                 station_payload['timezone'] = station_data['properties']['timeZone']
                 station_payload['latitude'] = station_data['geometry']['coordinates'][1]
                 station_payload['longitude'] = station_data['geometry']['coordinates'][0]
+                spinner.succeed(f"Weather station data fetched successfully from NOAA API.")
             else:
-                print(f"Could not retrieve station data for station: {station_id}")
+                spinner.fail(f"Could not retrieve station data for station: {station_id}")
                 continue
-            
+        
+            spinner.stop()
+            spinner = Halo(text=f'Fetching weather station observation data from NOAA API...', spinner='dots')
+
             # api call for station observation data
             observation_url = f"https://api.weather.gov/stations/{station_id}/observations/latest"
             observation_response = requests.get(observation_url)
@@ -473,6 +489,7 @@ def get_station_weather(station_data):
             observation_data = observation_response.json()
 
             if observation_data is not None:  
+                spinner.succeed(f"Weather station observation data fetched successfully from NOAA API.")
                 temperature = observation_data['properties']['temperature']
                 if temperature:
                     temperature = convert_temperature(temperature)
@@ -503,8 +520,11 @@ def get_station_weather(station_data):
                 station_payload['current_conditions'] = current_conditions
             else:
                 # Handle the case where observation data is None, e.g., by skipping the station
-                print(f"Could not retrieve observation data for station: {station_id}")
+                spinner.fail(f"Could not retrieve observation data for station: {station_id}")
                 continue
+
+            spinner.stop()
+            spinner = Halo(text=f'Fetching weather station forecast data from NOAA API...', spinner='dots')
 
             # api call for station forecast url
             station_point_url = f"https://api.weather.gov/points/{station_payload['latitude']},{station_payload['longitude']}"
@@ -512,6 +532,7 @@ def get_station_weather(station_data):
             point_data = response.json()
 
             if point_data is not None:
+                spinner.succeed(f"Weather station forecast data fetched successfully from NOAA API.")
                 forecast_url = point_data['properties']['forecast']
                 forecast_response = requests.get(forecast_url)
                 forecast_data = forecast_response.json()
@@ -520,8 +541,9 @@ def get_station_weather(station_data):
                 else:
                     print(f"Could not retrieve forecast data for station: {station_id}")
             else:
-                print(f"Could not retrieve point station data for station: {station_id}")
+                spinner.fail(f"Could not retrieve point station data for station: {station_id}")
             
+            spinner.stop()
             station_weather.append(station_payload)
 
         except requests.exceptions.HTTPError as e:
@@ -540,7 +562,7 @@ def print_zillow(lat,lon, browser):
     if county_state:
         zillow_county_state_url = generate_zillow_urls(county_state)
         print(f"\nZillow URL for {county_state}:")
-        print(f"{zillow_county_state_url}")
+        print(f"{zillow_county_state_url}\n")
         
         if browser:
             chrome_path = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
@@ -550,12 +572,13 @@ def print_zillow(lat,lon, browser):
                 subprocess.run([chrome_path, zillow_county_state_url], stdout=subprocess.DEVNULL)
 
     '''
+    '''
     # Get city and state and generate Zillow URL
     city_state = get_city_state_from_latlon(lat, lon)
     if city_state:
         zillow_city_state_url = generate_zillow_urls(city_state)
         print(f"\nZillow URL for {city_state}:")
-        print(f"{zillow_city_state_url}")
+        print(f"{zillow_city_state_url}\n")
         
         if browser:
             chrome_path = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
@@ -563,7 +586,7 @@ def print_zillow(lat,lon, browser):
             chrome = webbrowser.get('chrome')
             if chrome:
                 subprocess.run([chrome_path, zillow_city_state_url], stdout=subprocess.DEVNULL) 
-    '''
+    
 
 def print_station_forecasts(station_weather, browser=False):
     if station_weather:
@@ -1051,8 +1074,12 @@ def main():
                        help='Open weather station URLs in Chrome browser')
     args = parser.parse_args()
 
+
+
     print("Welcome to the Weather App!")
     print("This app uses the US Census & NOAA APIs")
+
+    notify_api_key_status()
 
     while True:
         print("\nMain Menu:")
