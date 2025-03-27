@@ -35,6 +35,10 @@ def geocode_address(address):
     """
     Geocodes an address using the US Census Geocoder API.
 
+    URLs:
+    https://geocoding.geo.census.gov/geocoder/locations/onelineaddress
+    https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?address=4600+Silver+Hill+Rd%2C+Washington%2C+DC+20233&benchmark=4&format=json
+
     Args:
       address: The street address to geocode.
 
