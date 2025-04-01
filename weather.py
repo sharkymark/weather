@@ -481,7 +481,7 @@ def get_station_weather(station_data):
         
             spinner.stop()
             spinner = Halo(text=f'Fetching weather station observation data from NOAA API...', spinner='dots')
-
+            spinner.start()
             # api call for station observation data
             observation_url = f"https://api.weather.gov/stations/{station_id}/observations/latest"
             observation_response = requests.get(observation_url)
@@ -525,7 +525,7 @@ def get_station_weather(station_data):
 
             spinner.stop()
             spinner = Halo(text=f'Fetching weather station forecast data from NOAA API...', spinner='dots')
-
+            spinner.start()
             # api call for station forecast url
             station_point_url = f"https://api.weather.gov/points/{station_payload['latitude']},{station_payload['longitude']}"
             response = requests.get(station_point_url)
