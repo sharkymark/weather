@@ -328,8 +328,6 @@ def convert_temperature(celsius_temperature_data):
         celsius_temperature_data['unitCode'] = ""
     return celsius_temperature_data
 
-
-
 def get_nearest_stations(latitude, longitude):
     """
     Fetches weather conditions for the 4 nearest weather stations from the NOAA API.
@@ -447,111 +445,117 @@ def get_station_weather(station_data):
     Fetches weather conditions for the specified airports from the NOAA API.
 
     Args:
-        stations: A dictionary containing the airport code and name.
-        airports: A boolean value to indicate whether the station is an airport.
+        station_data: A list of tuples containing the airport code and name.
+
     Returns:
-        A dictionary containing the weather conditions for the specified airports, or None if the API call fails.
+        A list of dictionaries containing the weather conditions for the specified airports.
     """
-
     station_weather = []
+
     for station_id, name in station_data:
+        station_payload = {'station_id': station_id, 'labelled_name': name}
 
-        station_payload = {'station_id': station_id}
-        station_payload['labelled_name'] = name
-
-        spinner = Halo(text=f'Fetching weather station data from NOAA API...', spinner='dots')
+        # Fetch station metadata
         try:
+            spinner = Halo(text=f'Fetching metadata for station {station_id}...', spinner='dots')
             spinner.start()
-            # api call for station name and timezone
             station_url = f"https://api.weather.gov/stations/{station_id}"
             station_response = requests.get(station_url)
             station_response.raise_for_status()
             station_data = station_response.json()
 
-            if station_data is not None:  
-                station_payload['station_id'] = station_id
-                station_payload['station_name'] = station_data['properties']['name']
-                station_payload['timezone'] = station_data['properties']['timeZone']
-                station_payload['latitude'] = station_data['geometry']['coordinates'][1]
-                station_payload['longitude'] = station_data['geometry']['coordinates'][0]
-                spinner.succeed(f"Weather station data fetched successfully from NOAA API.")
-            else:
-                spinner.fail(f"Could not retrieve station data for station: {station_id}")
-                continue
-        
+            station_payload['station_name'] = station_data['properties']['name']
+            station_payload['timezone'] = station_data['properties']['timeZone']
+            station_payload['latitude'] = station_data['geometry']['coordinates'][1]
+            station_payload['longitude'] = station_data['geometry']['coordinates'][0]
+            spinner.succeed(f"Metadata fetched for station {station_id}.")
+        except Exception as e:
+            spinner.fail(f"Failed to fetch metadata for station {station_id}: {e}")
+            station_payload['station_name'] = None
+            station_payload['timezone'] = None
+            station_payload['latitude'] = None
+            station_payload['longitude'] = None
+        finally:
             spinner.stop()
-            spinner = Halo(text=f'Fetching weather station observation data from NOAA API...', spinner='dots')
+
+        # Fetch observation data
+        try:
+            spinner = Halo(text=f'Fetching observation data for station {station_id}...', spinner='dots')
             spinner.start()
-            # api call for station observation data
             observation_url = f"https://api.weather.gov/stations/{station_id}/observations/latest"
             observation_response = requests.get(observation_url)
             observation_response.raise_for_status()
             observation_data = observation_response.json()
 
-            if observation_data is not None:  
-                spinner.succeed(f"Weather station observation data fetched successfully from NOAA API.")
-                temperature = observation_data['properties']['temperature']
-                if temperature:
-                    temperature = convert_temperature(temperature)
-                    temperature_value = temperature['value']
-                    temperature_unit = temperature['unitCode']
-                else:
-                    temperature_value = None
-                    temperature_unit = None
-
-                wind_speed = observation_data['properties']['windSpeed']
-                wind_speed_value = convert_kmh_to_mph(wind_speed['value'])
-                wind_speed_unit = "mph"  # Assuming mph is the target unit for conversion
-
-                wind_direction = observation_data['properties']['windDirection']
-                wind_direction_value = wind_direction['value'] if wind_direction else None
-
-                current_conditions = observation_data['properties']['textDescription']
-
-                address_map_url = generate_google_maps_url(station_payload['latitude'], station_payload['longitude'], "")
-                airports_url = generate_flightradar24_url(station_id)
-
-                station_payload['address_map_url'] = address_map_url
-                station_payload['airports_url'] = airports_url
-                station_payload['temperature'] = f"{temperature_value}" if temperature_value is not None else None
-                station_payload['temperature_unit'] = temperature_unit
-                station_payload['wind_speed'] = f"{wind_speed_value} {wind_speed_unit}" if wind_speed_value is not None else None
-                station_payload['wind_direction'] = wind_direction_value
-                station_payload['current_conditions'] = current_conditions
+            temperature = observation_data['properties']['temperature']
+            if temperature:
+                temperature = convert_temperature(temperature)
+                station_payload['temperature'] = temperature['value']
+                station_payload['temperature_unit'] = temperature['unitCode']
             else:
-                # Handle the case where observation data is None, e.g., by skipping the station
-                spinner.fail(f"Could not retrieve observation data for station: {station_id}")
-                continue
+                station_payload['temperature'] = None
+                station_payload['temperature_unit'] = None
 
+            wind_speed = observation_data['properties']['windSpeed']
+            station_payload['wind_speed'] = f"{convert_kmh_to_mph(wind_speed['value'])} mph" if wind_speed and wind_speed['value'] is not None else None
+
+            wind_direction = observation_data['properties']['windDirection']
+            station_payload['wind_direction'] = wind_direction['value'] if wind_direction else None
+
+            station_payload['current_conditions'] = observation_data['properties']['textDescription']
+            spinner.succeed(f"Observation data fetched for station {station_id}.")
+        except Exception as e:
+            spinner.fail(f"Failed to fetch observation data for station {station_id}: {e}")
+            station_payload['temperature'] = None
+            station_payload['temperature_unit'] = None
+            station_payload['wind_speed'] = None
+            station_payload['wind_direction'] = None
+            station_payload['current_conditions'] = None
+        finally:
             spinner.stop()
-            spinner = Halo(text=f'Fetching weather station forecast data from NOAA API...', spinner='dots')
-            spinner.start()
-            # api call for station forecast url
-            station_point_url = f"https://api.weather.gov/points/{station_payload['latitude']},{station_payload['longitude']}"
-            response = requests.get(station_point_url)
-            point_data = response.json()
 
-            if point_data is not None:
-                spinner.succeed(f"Weather station forecast data fetched successfully from NOAA API.")
+        # Fetch forecast data
+        try:
+            spinner = Halo(text=f'Fetching forecast data for station {station_id}...', spinner='dots')
+            spinner.start()
+            if station_payload['latitude'] is not None and station_payload['longitude'] is not None:
+                point_url = f"https://api.weather.gov/points/{station_payload['latitude']},{station_payload['longitude']}"
+                point_response = requests.get(point_url)
+                point_response.raise_for_status()
+                point_data = point_response.json()
+
                 forecast_url = point_data['properties']['forecast']
                 forecast_response = requests.get(forecast_url)
+                forecast_response.raise_for_status()
                 forecast_data = forecast_response.json()
-                if forecast_data is not None:
-                    station_payload['forecast'] = forecast_data['properties']['periods'][0]['detailedForecast']
-                else:
-                    print(f"Could not retrieve forecast data for station: {station_id}")
-            else:
-                spinner.fail(f"Could not retrieve point station data for station: {station_id}")
-            
-            spinner.stop()
-            station_weather.append(station_payload)
 
-        except requests.exceptions.HTTPError as e:
-            print(f"Station not found or API error for {station_id}: {e}")
-            continue  # Skip to the next station
+                station_payload['forecast'] = forecast_data['properties']['periods'][0]['detailedForecast']
+                spinner.succeed(f"Forecast data fetched for station {station_id}.")
+            else:
+                raise ValueError("Latitude and longitude are missing.")
         except Exception as e:
-            print(f"Unexpected error for station {station_id}: {e}")
-            continue  # Skip to the next station        
+            spinner.fail(f"Failed to fetch forecast data for station {station_id}: {e}")
+            station_payload['forecast'] = None
+        finally:
+            spinner.stop()
+
+        # Generate URLs
+        try:
+            if station_payload['latitude'] is not None and station_payload['longitude'] is not None:
+                station_payload['address_map_url'] = generate_google_maps_url(
+                    station_payload['latitude'], station_payload['longitude'], ""
+                )
+                station_payload['airports_url'] = generate_flightradar24_url(station_id)
+            else:
+                station_payload['address_map_url'] = None
+                station_payload['airports_url'] = None
+        except Exception as e:
+            print(f"Failed to generate URLs for station {station_id}: {e}")
+            station_payload['address_map_url'] = None
+            station_payload['airports_url'] = None
+
+        # Append the station payload to the results
+        station_weather.append(station_payload)
 
     return station_weather
 
@@ -680,134 +684,212 @@ def airports_menu(args):
         spinner.stop()
 
 def address_menu(args):
+    try:
+        stored_addresses = load_addresses()
 
-    stored_addresses = load_addresses()
+        if stored_addresses:
+            # Sort addresses by state code (assumes state code is the second-to-last element in the address)
+            sorted_addresses = sorted(stored_addresses, key=lambda addr: addr.split(",")[-2].strip() if len(addr.split(",")) > 1 else "")
 
-    if stored_addresses:
-        print("\nPreviously entered addresses:")
-        for i, address in enumerate(stored_addresses):
-            print(f"{i + 1}. {address}")
-        print("N. Enter a new address")
+            print("\nPreviously entered addresses (sorted by state code):")
+            for i, address in enumerate(sorted_addresses):
+                print(f"{i + 1}. {address}")
+            print("N. Enter a new address")
+            print("Q. Return to the previous menu")
+            
+            while True:
+                try:
+                    choice = input("Choose an option: ")
+                    if choice.upper() == 'N':
+                        address = input("Enter a street address: ")
+                        break
+                    elif choice.upper() == 'Q':
+                        return  # Return to the previous menu
+                    elif choice.isdigit() and 1 <= int(choice) <= len(sorted_addresses):
+                        address = sorted_addresses[int(choice) - 1]
+                        break
+                    else:
+                        print("Invalid choice. Please try again.")
+                except (KeyboardInterrupt, EOFError):
+                    print("\n\nExiting the program... Goodbye!")
+                    exit(0)
+        else:
+            address = input("\nEnter a street address: ")
+
+        latitude, longitude, matched_address = geocode_address(address)
+
+        if latitude is None or longitude is None:
+            print("\nAddress not found. Please try again.\n")
+            main()  # Reshow the main menu
+            return
+
+        if matched_address not in stored_addresses:
+            stored_addresses.append(matched_address)
+            save_addresses(stored_addresses)
+
+        print(f"\nMatched Address: {matched_address}")
+        print(f"Latitude: {latitude}, Longitude: {longitude}")
+        address_map_url = generate_google_maps_url(latitude, longitude, matched_address)
+        print(f"\nGoogle Maps URL for address: {address_map_url}")
+
+
+        zip_code = matched_address.split(",")[-1].strip()
+        zillow_url = generate_zillow_urls(zip_code)
+        print(f"\nZillow URL: {zillow_url}")
+
+        print("\nGetting forecasted weather conditions...")
+        conditions = get_short_conditions(latitude, longitude)
+        if conditions:
+            print(f"\nHigh Temperature: {conditions['temperature']} {conditions['temperatureUnit']}")
+            print(f"Forecasted conditions: {conditions['shortForecast']}")
+        else:
+            print("\nFailed to retrieve weather conditions.")
         
+        print("\nNOAA forecast webpage for this location:")
+        print(f"https://forecast.weather.gov/MapClick.php?lat={latitude}&lon={longitude}")
+
+        if args.browser:
+            chrome_path = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+            webbrowser.register('chrome', None, webbrowser.BackgroundBrowser(chrome_path))
+
+            chrome = webbrowser.get('chrome')
+            if chrome:
+                subprocess.run([chrome_path, f"https://forecast.weather.gov/MapClick.php?lat={latitude}&lon={longitude}"], stdout=subprocess.DEVNULL)
+                subprocess.run([chrome_path, address_map_url], stdout=subprocess.DEVNULL)
+                subprocess.run([chrome_path, zillow_url], stdout=subprocess.DEVNULL)
+
+
         while True:
-            choice = input("Choose an option: ")
-            if choice.upper() == 'N':
-                address = input("Enter a street address: ")
-                break
-            elif choice.isdigit() and 1 <= int(choice) <= len(stored_addresses):
-                address = stored_addresses[int(choice) - 1]
-                break
-            else:
-                print("Invalid choice. Please try again.")
-    else:
-        address = input("\nEnter a street address: ")
+            print("\nOptions:")
+            print("1. Get Detailed Conditions")
+            print("2. Get Extended Forecast")
+            print("3. Get Hourly Forecast")
+            print("4. Get Weather for Nearest Stations")
+            print("5. Get Active Weather Alerts")
+            print("6. Get Weather for a Different Location")
+            print("7. Return to Main Menu")
+            try:
+                choice = input("Enter your choice: ")
 
-    latitude, longitude, matched_address = geocode_address(address)
+                if choice == '1':
+                    print("\nGetting detailed current conditions...")
+                    conditions = get_current_conditions(latitude, longitude)
+                    if conditions:
+                        print(f"\nCurrent Conditions: {conditions['name']}")
+                        print(f"Temperature: {conditions['temperature']} {conditions['temperatureUnit']}")
+                        print(f"Short Forecast: {conditions['shortForecast']}")
+                        print(f"Wind Speed: {conditions['windSpeed']}")
+                        print(f"Wind Direction: {conditions['windDirection']}")
+                        value = conditions.get('probabilityOfPrecipitation', {}).get('value')
+                        print(f"Precipitation Probability: {value}%") if value is not None else print("Precipitation Probability: N/A")
+                        print(f"Detailed forecast: {conditions['detailedForecast']}")
+                    else:
+                        print("Failed to retrieve current conditions.")
+                elif choice == '2':
+                    print("Getting extended forecast...")
+                    forecast = get_extended_forecast(latitude, longitude)
+                    if forecast:
+                        for period in forecast:
+                            print(f"\nForecast for: {period['name']}")
+                            print(f"Temperature: {period['temperature']} {period['temperatureUnit']}")
+                            print(f"Detailed Forecast: {period['detailedForecast']}")
+                            print("-" * 20)
+                    else:
+                        print("Failed to retrieve extended forecast.")
+                elif choice == '3':
+                    print("Getting hourly forecast...")
+                    hourly_forecast = get_hourly_forecast(latitude, longitude)
+                    if hourly_forecast:
+                        for period in hourly_forecast:
+                            formatted_time = format_time(period['startTime'])
+                            print(f"\nHourly Forecast for: {formatted_time}")
+                            print(f"Temperature: {period['temperature']} {period['temperatureUnit']}")
+                            print(f"Short Forecast: {period['shortForecast']}")
+                            print("-" * 20)
+                    else:
+                        print("Failed to retrieve hourly forecast.")
+                elif choice == '4':
+                    print("Getting weather for nearest stations...")
+                    stations = get_nearest_stations(latitude, longitude)
+                    if stations:
+                        print("\n")
+                        
+                        for station in stations:
 
-    if latitude is None or longitude is None:
-        print("\nAddress not found. Please try again.\n")
-        main()  # Reshow the main menu
-        return
+                            print(f"Station Name: {station['name']}")
+                            print(f"Station ID: {station['station_id']}")
+                            print(f"Temperature: {station['temperature']} {station['temperature_unit']}")
+                            print(f"Wind Speed: {station['wind_speed']}")
+                            print(f"Wind Direction: {station['wind_direction']}")
+                            print(f"Google Maps URL for station: {station['address_map_url']}")
+                            print("-" * 20)
 
-    if matched_address not in stored_addresses:
-        stored_addresses.append(matched_address)
-        save_addresses(stored_addresses)
+                            if args.browser:
+                                chrome_path = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+                                webbrowser.register('chrome', None, webbrowser.BackgroundBrowser(chrome_path))
 
-    print(f"\nMatched Address: {matched_address}")
-    print(f"Latitude: {latitude}, Longitude: {longitude}")
-    address_map_url = generate_google_maps_url(latitude, longitude, matched_address)
-    print(f"\nGoogle Maps URL for address: {address_map_url}")
-
-
-    zip_code = matched_address.split(",")[-1].strip()
-    zillow_url = generate_zillow_urls(zip_code)
-    print(f"\nZillow URL: {zillow_url}")
-
-    print("\nGetting forecasted weather conditions...")
-    conditions = get_short_conditions(latitude, longitude)
-    if conditions:
-        print(f"\nHigh Temperature: {conditions['temperature']} {conditions['temperatureUnit']}")
-        print(f"Forecasted conditions: {conditions['shortForecast']}")
-    else:
-        print("\nFailed to retrieve weather conditions.")
-    
-    print("\nNOAA forecast webpage for this location:")
-    print(f"https://forecast.weather.gov/MapClick.php?lat={latitude}&lon={longitude}")
-
-    if args.browser:
-        chrome_path = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-        webbrowser.register('chrome', None, webbrowser.BackgroundBrowser(chrome_path))
-
-        chrome = webbrowser.get('chrome')
-        if chrome:
-            subprocess.run([chrome_path, f"https://forecast.weather.gov/MapClick.php?lat={latitude}&lon={longitude}"], stdout=subprocess.DEVNULL)
-            subprocess.run([chrome_path, address_map_url], stdout=subprocess.DEVNULL)
-            subprocess.run([chrome_path, zillow_url], stdout=subprocess.DEVNULL)
+                                chrome = webbrowser.get('chrome')
+                                if chrome:
+                                    subprocess.run([chrome_path, station['address_map_url']], stdout=subprocess.DEVNULL)
 
 
-    while True:
-        print("\nOptions:")
-        print("1. Get Detailed Conditions")
-        print("2. Get Extended Forecast")
-        print("3. Get Hourly Forecast")
-        print("4. Get Weather for Nearest Stations")
-        print("5. Get Active Weather Alerts")
-        print("6. Get Weather for a Different Location")
-        print("7. Return to Main Menu")
-        choice = input("Enter your choice: ")
+                    else:
+                        print("Failed to retrieve weather for nearest stations.")
+                elif choice == '6':
+                    stored_addresses = load_addresses()
+                    if stored_addresses:
+                        # Sort addresses by state code (assumes state code is the second-to-last element in the address)
+                        sorted_addresses = sorted(stored_addresses, key=lambda addr: addr.split(",")[-2].strip() if len(addr.split(",")) > 1 else "")
 
-        if choice == '1':
-            print("\nGetting detailed current conditions...")
-            conditions = get_current_conditions(latitude, longitude)
-            if conditions:
-                print(f"\nCurrent Conditions: {conditions['name']}")
-                print(f"Temperature: {conditions['temperature']} {conditions['temperatureUnit']}")
-                print(f"Short Forecast: {conditions['shortForecast']}")
-                print(f"Wind Speed: {conditions['windSpeed']}")
-                print(f"Wind Direction: {conditions['windDirection']}")
-                value = conditions.get('probabilityOfPrecipitation', {}).get('value')
-                print(f"Precipitation Probability: {value}%") if value is not None else print("Precipitation Probability: N/A")
-                print(f"Detailed forecast: {conditions['detailedForecast']}")
-            else:
-                print("Failed to retrieve current conditions.")
-        elif choice == '2':
-            print("Getting extended forecast...")
-            forecast = get_extended_forecast(latitude, longitude)
-            if forecast:
-                for period in forecast:
-                    print(f"\nForecast for: {period['name']}")
-                    print(f"Temperature: {period['temperature']} {period['temperatureUnit']}")
-                    print(f"Detailed Forecast: {period['detailedForecast']}")
-                    print("-" * 20)
-            else:
-                print("Failed to retrieve extended forecast.")
-        elif choice == '3':
-            print("Getting hourly forecast...")
-            hourly_forecast = get_hourly_forecast(latitude, longitude)
-            if hourly_forecast:
-                for period in hourly_forecast:
-                    formatted_time = format_time(period['startTime'])
-                    print(f"\nHourly Forecast for: {formatted_time}")
-                    print(f"Temperature: {period['temperature']} {period['temperatureUnit']}")
-                    print(f"Short Forecast: {period['shortForecast']}")
-                    print("-" * 20)
-            else:
-                print("Failed to retrieve hourly forecast.")
-        elif choice == '4':
-            print("Getting weather for nearest stations...")
-            stations = get_nearest_stations(latitude, longitude)
-            if stations:
-                print("\n")
-                 
-                for station in stations:
+                        print("\nPreviously entered addresses (sorted by state code):")
+                        for i, address in enumerate(sorted_addresses):
+                            print(f"{i + 1}. {address}")
+                        print("N. Enter a new address")
+                        print("Q. Return to the previous menu")
 
-                    print(f"Station Name: {station['name']}")
-                    print(f"Station ID: {station['station_id']}")
-                    print(f"Temperature: {station['temperature']} {station['temperature_unit']}")
-                    print(f"Wind Speed: {station['wind_speed']}")
-                    print(f"Wind Direction: {station['wind_direction']}")
-                    print(f"Google Maps URL for station: {station['address_map_url']}")
-                    print("-" * 20)
+                        while True:
+                            try:
+                                choice = input("Choose an option: ")
+                                if choice.upper() == 'N':
+                                    address = input("Enter a street address: ")
+                                    break
+                                elif choice.upper() == 'Q':
+                                    return  # Return to the previous menu
+                                elif choice.isdigit() and 1 <= int(choice) <= len(sorted_addresses):
+                                    address = sorted_addresses[int(choice) - 1]
+                                    break
+                                else:
+                                    print("Invalid choice. Please try again.")
+                            except (KeyboardInterrupt, EOFError):
+                                print("\n\nExiting the program... Goodbye!")
+                                exit(0)
+                    else:
+                        address = input("Enter a street address: ")
+
+                    latitude, longitude, matched_address = geocode_address(address)
+                    if latitude is None or longitude is None:
+                        continue
+
+                    if matched_address not in stored_addresses:
+                        stored_addresses.append(matched_address)
+                        save_addresses(stored_addresses)
+
+                    print(f"Matched Address: {matched_address}")
+                    print(f"Latitude: {latitude}, Longitude: {longitude}")
+                    address_map_url = generate_google_maps_url(latitude, longitude, matched_address)
+                    print(f"\nGoogle Maps URL for address: {address_map_url}")
+
+                    zip_code = matched_address.split(",")[-1].strip()
+                    zillow_url = generate_zillow_urls(zip_code)
+                    print(f"\nZillow URL: {zillow_url}")
+
+                    print("\nGetting forecasted weather conditions...")
+                    conditions = get_short_conditions(latitude, longitude)
+                    if conditions:
+                        print(f"\nHigh Temperature: {conditions['temperature']} {conditions['temperatureUnit']}")
+                        print(f"Forecasted Conditions: {conditions['shortForecast']}")
+                    else:
+                        print("\nFailed to retrieve weather conditions.")
 
                     if args.browser:
                         chrome_path = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
@@ -815,89 +897,40 @@ def address_menu(args):
 
                         chrome = webbrowser.get('chrome')
                         if chrome:
-                            subprocess.run([chrome_path, station['address_map_url']], stdout=subprocess.DEVNULL)
+                            subprocess.run([chrome_path, f"https://forecast.weather.gov/MapClick.php?lat={latitude}&lon={longitude}"], stdout=subprocess.DEVNULL)
+                            subprocess.run([chrome_path, address_map_url], stdout=subprocess.DEVNULL)
+                            subprocess.run([chrome_path, zillow_url], stdout=subprocess.DEVNULL)
 
 
-            else:
-                print("Failed to retrieve weather for nearest stations.")
-        elif choice == '6':
-            stored_addresses = load_addresses()
-            if stored_addresses:
-                print("\nPreviously entered addresses:")
-                for i, address in enumerate(stored_addresses):
-                    print(f"{i + 1}. {address}")
-                print("N. Enter a new address")
 
-                choice = input("Choose an option: ")
-                if choice.upper() == 'N':
-                    address = input("Enter a street address: ")
-                elif choice.isdigit() and 1 <= int(choice) <= len(stored_addresses):
-                    address = stored_addresses[int(choice) - 1]
+
+                elif choice == '5':
+                    print("Getting active weather alerts...")
+                    alerts = get_active_alerts(latitude, longitude)
+                    if alerts:
+                        print("\nActive Weather Alerts:")
+                        for alert in alerts:
+                            props = alert['properties']
+                            print(f"Headline: {props['headline']}")
+                            print(f"Description: {props['description']}")
+                            print(f"Severity: {props['severity']}")
+                            print(f"Urgency: {props['urgency']}")
+                            print(f"Effective: {format_time(props['effective'])}")
+                            print(f"Expires: {format_time(props['expires'])}")
+                            print("-" * 70)
+                    else:
+                        print("No active weather alerts for this location.")
+                elif choice == '7':
+                    print("\n Returning to main menu...")
+                    return
                 else:
                     print("Invalid choice. Please try again.")
-                    continue
-            else:
-                address = input("Enter a street address: ")
-
-            latitude, longitude, matched_address = geocode_address(address)
-            if latitude is None or longitude is None:
-                continue
-
-            if matched_address not in stored_addresses:
-                stored_addresses.append(matched_address)
-                save_addresses(stored_addresses)
-
-            print(f"Matched Address: {matched_address}")
-            print(f"Latitude: {latitude}, Longitude: {longitude}")
-            address_map_url = generate_google_maps_url(latitude, longitude, matched_address)
-            print(f"\nGoogle Maps URL for address: {address_map_url}")
-
-            zip_code = matched_address.split(",")[-1].strip()
-            zillow_url = generate_zillow_urls(zip_code)
-            print(f"\nZillow URL: {zillow_url}")
-
-            print("\nGetting forecasted weather conditions...")
-            conditions = get_short_conditions(latitude, longitude)
-            if conditions:
-                print(f"\nHigh Temperature: {conditions['temperature']} {conditions['temperatureUnit']}")
-                print(f"Forecasted Conditions: {conditions['shortForecast']}")
-            else:
-                print("\nFailed to retrieve weather conditions.")
-
-            if args.browser:
-                chrome_path = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-                webbrowser.register('chrome', None, webbrowser.BackgroundBrowser(chrome_path))
-
-                chrome = webbrowser.get('chrome')
-                if chrome:
-                    subprocess.run([chrome_path, f"https://forecast.weather.gov/MapClick.php?lat={latitude}&lon={longitude}"], stdout=subprocess.DEVNULL)
-                    subprocess.run([chrome_path, address_map_url], stdout=subprocess.DEVNULL)
-                    subprocess.run([chrome_path, zillow_url], stdout=subprocess.DEVNULL)
-
-
-
-
-        elif choice == '5':
-            print("Getting active weather alerts...")
-            alerts = get_active_alerts(latitude, longitude)
-            if alerts:
-                print("\nActive Weather Alerts:")
-                for alert in alerts:
-                    props = alert['properties']
-                    print(f"Headline: {props['headline']}")
-                    print(f"Description: {props['description']}")
-                    print(f"Severity: {props['severity']}")
-                    print(f"Urgency: {props['urgency']}")
-                    print(f"Effective: {format_time(props['effective'])}")
-                    print(f"Expires: {format_time(props['expires'])}")
-                    print("-" * 70)
-            else:
-                print("No active weather alerts for this location.")
-        elif choice == '7':
-            print("\n Returning to main menu...")
-            return
-        else:
-            print("Invalid choice. Please try again.")
+            except (KeyboardInterrupt, EOFError):
+                print("\n\nExiting the program... Goodbye!")
+                exit(0)
+    except (KeyboardInterrupt, EOFError):
+        print("\n\nExiting the program... Goodbye!")
+        exit(0)
 
 def airport_search(args):
     """Search airports by wildcard"""
@@ -910,7 +943,11 @@ def airport_search(args):
     airports_df = pd.read_csv('airports_download.csv')
     
     # Get search term
-    search_term = input("\nEnter airport code, state, municipality, or name wildcard (use * for any characters): ").strip().upper()
+    try:
+        search_term = input("\nEnter airport code, state, municipality, or name wildcard (use * for any characters): ").strip().upper()
+    except (KeyboardInterrupt, EOFError):
+        print("\n\nExiting the program... Goodbye!")
+        exit(0)
     
     # Convert wildcard to regex
     search_regex = search_term.replace('*', '.*')
@@ -927,7 +964,7 @@ def airport_search(args):
         print("No matching airports found.")
         return
     
-    # Sort
+    # Sort by iso region, then municipality (second value in parentheses)
     matches = matches.sort_values(by=['iso_region', 'municipality', 'name'], ascending=True)
 
     # Replace NaN values with "N/A" in the relevant columns
@@ -941,7 +978,7 @@ def airport_search(args):
     # Let user select
     while True:
         # Display matches with numbers
-        print("\nMatching airports:")
+        print("\nMatching airports: (sorted by iso region, then municipality)")
         for i, (_, row) in enumerate(matches.iterrows()):
             print(f"{i+1}. {row['ident']} - {row['name']} ({row['iso_region']}, {row['municipality']})")
         
@@ -966,16 +1003,20 @@ def airport_search(args):
                     print("1. Select another airport from this list")
                     print("2. Search again")
                     print("3. Return to main menu")
-                    choice = input("Enter your choice: ")
+                    try:
+                        choice = input("Enter your choice: ")
                     
-                    if choice == '1':
-                        break  # Break out of options menu to show airport list again
-                    elif choice == '2':
-                        return airport_search(args)  # Start new search
-                    elif choice == '3':
-                        return  # Return to main menu
-                    else:
-                        print("Invalid choice. Please try again.")
+                        if choice == '1':
+                            break  # Break out of options menu to show airport list again
+                        elif choice == '2':
+                            return airport_search(args)  # Start new search
+                        elif choice == '3':
+                            return  # Return to main menu
+                        else:
+                            print("Invalid choice. Please try again.")
+                    except (KeyboardInterrupt, EOFError):
+                        print("\n\nExiting the program... Goodbye!")
+                        exit(0)
                 
                 # If we broke out of options menu with choice 1, continue outer loop
                 continue
@@ -983,6 +1024,9 @@ def airport_search(args):
             print("Invalid choice. Please try again.")
         except ValueError:
             print("Please enter a valid number or 'q' to quit.")
+        except (KeyboardInterrupt, EOFError):
+            print("\n\nExiting the program... Goodbye!")
+            exit(0)
 
 def airport_download(args, print_results=True):
     """
@@ -995,12 +1039,16 @@ def airport_download(args, print_results=True):
 # Ask the user if they want to filter by scheduled service
     while True:
         print("Do you want to filter by airports that provide scheduled service?")
-        filter_by_scheduled = input("Enter 1 for scheduled service, 2 for no: ").strip()
+        try:
+            filter_by_scheduled = input("Enter 1 for scheduled service, 2 for no: ").strip()
         
-        if filter_by_scheduled in ['1', '2']:
-            break
-        else:
-            print("Invalid input. Please enter 1 or 2.")
+            if filter_by_scheduled in ['1', '2']:
+                break
+            else:
+                print("Invalid input. Please enter 1 or 2.")
+        except (KeyboardInterrupt, EOFError):
+            print("\n\nExiting the program... Goodbye!")
+            exit(0)
 
     spinner = Halo(text='Downloading airport data from NOAA...', spinner='dots')
     try:
@@ -1081,33 +1129,41 @@ def main():
 
     notify_api_key_status()
 
-    while True:
-        print("\nMain Menu:")
-        print("1. Get specific address weather")
-        print("2. Get airport weather")
-        print("3. Download random airports & get weather")
-        print("4. Search airports")
-        print("5. Exit")
-        choice = input("Enter your choice (1-5): ")
-        print("\n")
-        if choice == '1':
-            address_menu(args)
-        elif choice == '2':
-            airports_menu(args)
-        elif choice == '3':
-            airport_download(args, print_results=True)
-        elif choice == '4':
-            airport_search(args)
-        elif choice == '5':
-            print("\n Exiting the program... Goodbye!")
-            break
-        else:
-            print("Invalid choice. Please enter a number between 1 and 5.")
-
-
+    try:
+        while True:
+            try:
+                print("\nMain Menu:")
+                print("1. Get specific address weather")
+                print("2. Get airport weather")
+                print("3. Download random airports & get weather")
+                print("4. Search airports")
+                print("5. Exit")
+                choice = input("Enter your choice (1-5): ")
+                print("\n")
+                if choice == '1':
+                    address_menu(args)
+                elif choice == '2':
+                    airports_menu(args)
+                elif choice == '3':
+                    airport_download(args, print_results=True)
+                elif choice == '4':
+                    airport_search(args)
+                elif choice == '5':
+                    print("\nExiting the program... Goodbye!")
+                    break
+                else:
+                    print("Invalid choice. Please enter a number between 1 and 5.")
+            except (KeyboardInterrupt, EOFError):
+                print("\n\nExiting the program... Goodbye!")
+                exit(0)
+    except (KeyboardInterrupt, EOFError):
+        print("\n\nExiting the program... Goodbye!")
+        exit(0)
 
 if __name__ == "__main__":
     try:
         main()
+    except (KeyboardInterrupt, EOFError):
+        print("\n\nExiting the program... Goodbye!")
     except Exception as e:
         print(f"An unexpected error occurred: {e}")
