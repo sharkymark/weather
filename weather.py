@@ -104,11 +104,11 @@ def generate_google_maps_url(latitude, longitude, label):
 def get_county_state_from_latlon(latitude, longitude):
     """
     Gets county and state from latitude and longitude using FCC API.
-    
+
     Args:
         latitude: The latitude of the location.
         longitude: The longitude of the location.
-        
+
     Returns:
         county and state as string or None if not found.
     """
@@ -130,17 +130,17 @@ def get_county_state_from_latlon(latitude, longitude):
 def get_city_state_from_latlon(latitude, longitude):
     """
     Gets city from latitude and longitude using US Census API.
-    
+
     Args:
         latitude: The latitude of the location.
         longitude: The longitude of the location.
-        
+
     Returns:
         city and state as string or None if not found.
-    
+
     Example:
     https://geocoding.geo.census.gov/geocoder/geographies/coordinates?x=-156.05056&y=19.74083&benchmark=Public_AR_Current&vintage=Current_Current&format=json
-    
+
     """
     spinner = Halo(text='Reverse geocoding lat lon for city and state...', spinner='dots')
     try:
@@ -164,8 +164,8 @@ def get_city_state_from_latlon(latitude, longitude):
         try:
             county_city = data['result']['geographies']['County Subdivisions'][0]['BASENAME']
         except (KeyError, IndexError):
-            county_city = None            
-        
+            county_city = None
+
         if city_state:
             spinner.succeed("City and state received successfully")
             return city_state
@@ -187,10 +187,10 @@ def get_city_state_from_latlon(latitude, longitude):
 def generate_zillow_urls(arg):
     """
     Generates Zillow URLs for sale and rent listings.
-    
+
     Args:
         county+state or city+state: to search.
-        
+
     Returns:
         Tuple of (sale_url, rent_url)
     """
@@ -265,7 +265,8 @@ def get_extended_forecast(latitude, longitude):
     Returns:
         A list of dictionaries containing the extended weather forecast, or None if the API call fails.
     """
-    return _fetch_noaa_data(latitude, longitude, 'forecast')
+    data = _fetch_noaa_data(latitude, longitude, 'forecast')
+    return data if data else None
 
 def get_short_conditions(latitude, longitude):
     """
@@ -278,7 +279,10 @@ def get_short_conditions(latitude, longitude):
     Returns:
         A dictionary containing the detailed weather conditions, or None if the API call fails.
     """
-    return _fetch_noaa_data(latitude, longitude, 'forecast')[0]
+    data = _fetch_noaa_data(latitude, longitude, 'forecast')
+    return data[0] if data else None
+
+
 
 def format_time(iso_time):
     """
@@ -339,7 +343,7 @@ def get_nearest_stations(latitude, longitude):
     Returns:
         A list of dictionaries containing the weather conditions for the nearest stations, or None if the API call fails.
     """
-    
+
     spinner = Halo(text='Fetching nearest stations...', spinner='dots')
     try:
         spinner.start()
@@ -455,10 +459,10 @@ def get_station_weather(station_data):
     for station_id, name in station_data:
         station_payload = {'station_id': station_id, 'labelled_name': name}
 
+        spinner = Halo(text=f'Fetching metadata for station {station_id}...', spinner='dots')
+        spinner.start()
         # Fetch station metadata
         try:
-            spinner = Halo(text=f'Fetching metadata for station {station_id}...', spinner='dots')
-            spinner.start()
             station_url = f"https://api.weather.gov/stations/{station_id}"
             station_response = requests.get(station_url)
             station_response.raise_for_status()
@@ -476,9 +480,9 @@ def get_station_weather(station_data):
             spinner.stop()
 
         # Fetch observation data
+        spinner = Halo(text=f'Fetching observation data for station {station_id}...', spinner='dots')
+        spinner.start()        #
         try:
-            spinner = Halo(text=f'Fetching observation data for station {station_id}...', spinner='dots')
-            spinner.start()
             observation_url = f"https://api.weather.gov/stations/{station_id}/observations/latest"
             observation_response = requests.get(observation_url)
             observation_response.raise_for_status()
@@ -512,9 +516,9 @@ def get_station_weather(station_data):
             spinner.stop()
 
         # Fetch forecast data
+        spinner = Halo(text=f'Fetching forecast data for station {station_id}...', spinner='dots')
+        spinner.start()        #
         try:
-            spinner = Halo(text=f'Fetching forecast data for station {station_id}...', spinner='dots')
-            spinner.start()
             if station_payload['latitude'] is not None and station_payload['longitude'] is not None:
                 point_url = f"https://api.weather.gov/points/{station_payload['latitude']},{station_payload['longitude']}"
                 point_response = requests.get(point_url)
@@ -557,14 +561,14 @@ def get_station_weather(station_data):
     return station_weather
 
 def print_zillow(lat,lon, browser):
-    
+
     # Get county and state and generate Zillow URL
     county_state = get_county_state_from_latlon(lat, lon)
     if county_state:
         zillow_county_state_url = generate_zillow_urls(county_state)
         print(f"\nZillow URL for {county_state}:")
         print(f"{zillow_county_state_url}\n")
-        
+
         if browser:
             chrome_path = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
             webbrowser.register('chrome', None, webbrowser.BackgroundBrowser(chrome_path))
@@ -580,19 +584,19 @@ def print_zillow(lat,lon, browser):
         zillow_city_state_url = generate_zillow_urls(city_state)
         print(f"\nZillow URL for {city_state}:")
         print(f"{zillow_city_state_url}\n")
-        
+
         if browser:
             chrome_path = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
             webbrowser.register('chrome', None, webbrowser.BackgroundBrowser(chrome_path))
             chrome = webbrowser.get('chrome')
             if chrome:
-                subprocess.run([chrome_path, zillow_city_state_url], stdout=subprocess.DEVNULL) 
-    
+                subprocess.run([chrome_path, zillow_city_state_url], stdout=subprocess.DEVNULL)
+
 
 def print_station_forecasts(station_weather, browser=False):
     if station_weather:
         print("\n\nAirport Weather Conditions:\n")
-            
+
         for station in station_weather:
             print("-" * 20)
             print(f"Station ID: {station['station_id']}")
@@ -610,7 +614,7 @@ def print_station_forecasts(station_weather, browser=False):
             print("\n")
             print(f"https://forecast.weather.gov/MapClick.php?lat={station['latitude']}&lon={station['longitude']}")
             print("\n")
-        
+
             if browser:
                 chrome_path = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
                 webbrowser.register('chrome', None, webbrowser.BackgroundBrowser(chrome_path))
@@ -645,10 +649,10 @@ def print_station_forecasts(station_weather, browser=False):
         print("No airport data available to print.")
 
 def airports_menu(args):
-    
+
+    spinner = Halo(text='Reading airport data from file...', spinner='dots')
+    spinner.start()
     try:
-        spinner = Halo(text='Reading airport data from file...', spinner='dots')
-        spinner.start()
         with open('airports.txt', 'r') as file:
             station_ids = []
             for line in file:
@@ -662,11 +666,11 @@ def airports_menu(args):
                         'name': airport_name.strip(),
                         'include_in_api': include_in_api
                     })
-        
+
         if not station_ids:
             spinner.fail("No airport data found in file. Please add airport codes on new lines in the airports.txt file. e.g., KBZN")
             return None
-        
+
         spinner.succeed("Airport data read successfully.")
 
     except FileNotFoundError:
@@ -709,7 +713,7 @@ def address_menu(args):
                 print(f"{i + 1}. {address}")
             print("N. Enter a new address")
             print("Q. Return to the previous menu")
-            
+
             while True:
                 try:
                     choice = input("Choose an option: ")
@@ -736,7 +740,7 @@ def address_menu(args):
             main()  # Reshow the main menu
             return
 
-        if matched_address not in stored_addresses:
+        if matched_address and matched_address not in stored_addresses:
             stored_addresses.append(matched_address)
             save_addresses(stored_addresses)
 
@@ -745,8 +749,7 @@ def address_menu(args):
         address_map_url = generate_google_maps_url(latitude, longitude, matched_address)
         print(f"\nGoogle Maps URL for address: {address_map_url}")
 
-
-        zip_code = matched_address.split(",")[-1].strip()
+        zip_code = matched_address.split(",")[-1].strip() if matched_address else ""
         zillow_url = generate_zillow_urls(zip_code)
         print(f"\nZillow URL: {zillow_url}")
 
@@ -757,7 +760,7 @@ def address_menu(args):
             print(f"Forecasted conditions: {conditions['shortForecast']}")
         else:
             print("\nFailed to retrieve weather conditions.")
-        
+
         print("\nNOAA forecast webpage for this location:")
         print(f"https://forecast.weather.gov/MapClick.php?lat={latitude}&lon={longitude}")
 
@@ -770,7 +773,6 @@ def address_menu(args):
                 subprocess.run([chrome_path, f"https://forecast.weather.gov/MapClick.php?lat={latitude}&lon={longitude}"], stdout=subprocess.DEVNULL)
                 subprocess.run([chrome_path, address_map_url], stdout=subprocess.DEVNULL)
                 subprocess.run([chrome_path, zillow_url], stdout=subprocess.DEVNULL)
-
 
         while True:
             print("\nOptions:")
@@ -826,9 +828,8 @@ def address_menu(args):
                     stations = get_nearest_stations(latitude, longitude)
                     if stations:
                         print("\n")
-                        
-                        for station in stations:
 
+                        for station in stations:
                             print(f"Station Name: {station['name']}")
                             print(f"Station ID: {station['station_id']}")
                             print(f"Temperature: {station['temperature']} {station['temperature_unit']}")
@@ -844,10 +845,24 @@ def address_menu(args):
                                 chrome = webbrowser.get('chrome')
                                 if chrome:
                                     subprocess.run([chrome_path, station['address_map_url']], stdout=subprocess.DEVNULL)
-
-
                     else:
                         print("Failed to retrieve weather for nearest stations.")
+                elif choice == '5':
+                    print("Getting active weather alerts...")
+                    alerts = get_active_alerts(latitude, longitude)
+                    if alerts:
+                        print("\nActive Weather Alerts:")
+                        for alert in alerts:
+                            props = alert['properties']
+                            print(f"Headline: {props['headline']}")
+                            print(f"Description: {props['description']}")
+                            print(f"Severity: {props['severity']}")
+                            print(f"Urgency: {props['urgency']}")
+                            print(f"Effective: {format_time(props['effective'])}")
+                            print(f"Expires: {format_time(props['expires'])}")
+                            print("-" * 70)
+                    else:
+                        print("No active weather alerts for this location.")
                 elif choice == '6':
                     stored_addresses = load_addresses()
                     if stored_addresses:
@@ -883,7 +898,7 @@ def address_menu(args):
                     if latitude is None or longitude is None:
                         continue
 
-                    if matched_address not in stored_addresses:
+                    if matched_address and matched_address not in stored_addresses:
                         stored_addresses.append(matched_address)
                         save_addresses(stored_addresses)
 
@@ -892,7 +907,7 @@ def address_menu(args):
                     address_map_url = generate_google_maps_url(latitude, longitude, matched_address)
                     print(f"\nGoogle Maps URL for address: {address_map_url}")
 
-                    zip_code = matched_address.split(",")[-1].strip()
+                    zip_code = matched_address.split(",")[-1].strip() if matched_address else ""
                     zillow_url = generate_zillow_urls(zip_code)
                     print(f"\nZillow URL: {zillow_url}")
 
@@ -913,26 +928,6 @@ def address_menu(args):
                             subprocess.run([chrome_path, f"https://forecast.weather.gov/MapClick.php?lat={latitude}&lon={longitude}"], stdout=subprocess.DEVNULL)
                             subprocess.run([chrome_path, address_map_url], stdout=subprocess.DEVNULL)
                             subprocess.run([chrome_path, zillow_url], stdout=subprocess.DEVNULL)
-
-
-
-
-                elif choice == '5':
-                    print("Getting active weather alerts...")
-                    alerts = get_active_alerts(latitude, longitude)
-                    if alerts:
-                        print("\nActive Weather Alerts:")
-                        for alert in alerts:
-                            props = alert['properties']
-                            print(f"Headline: {props['headline']}")
-                            print(f"Description: {props['description']}")
-                            print(f"Severity: {props['severity']}")
-                            print(f"Urgency: {props['urgency']}")
-                            print(f"Effective: {format_time(props['effective'])}")
-                            print(f"Expires: {format_time(props['expires'])}")
-                            print("-" * 70)
-                    else:
-                        print("No active weather alerts for this location.")
                 elif choice == '7':
                     print("\n Returning to main menu...")
                     return
@@ -950,21 +945,21 @@ def airport_search(args):
     # Check if airports_download.csv exists
     if not os.path.exists('airports_download.csv'):
         print("Airport database not found. Downloading...")
-        airport_download(print_results=False)
-    
+        airport_download(args, print_results=False)  # Include args here
+
     # Load airport data
     airports_df = pd.read_csv('airports_download.csv')
-    
+
     # Get search term
     try:
         search_term = input("\nEnter airport code, state, municipality, or name wildcard (use * for any characters): ").strip().upper()
     except (KeyboardInterrupt, EOFError):
         print("\n\nExiting the program... Goodbye!")
         exit(0)
-    
+
     # Convert wildcard to regex
     search_regex = search_term.replace('*', '.*')
-    
+
     # Search both code, name, municipality, and state
     matches = airports_df[
         (airports_df['ident'].str.upper().str.contains(search_regex)) |
@@ -972,13 +967,13 @@ def airport_search(args):
         (airports_df['municipality'].str.upper().str.contains(search_regex)) |
         (airports_df['iso_region'].str.upper().str.contains(search_regex))
     ]
-    
+
     if matches.empty:
         print("No matching airports found.")
         return
-    
+
     # Sort by iso region, then municipality (second value in parentheses)
-    matches = matches.sort_values(by=['iso_region', 'municipality', 'name'], ascending=True)
+    matches.sort_values(by=['iso_region', 'municipality', 'name'], ascending=[True,True,True])
 
     # Replace NaN values with "N/A" in the relevant columns
     matches.fillna({
@@ -994,22 +989,22 @@ def airport_search(args):
         print("\nMatching airports: (sorted by iso region, then municipality)")
         for i, (_, row) in enumerate(matches.iterrows()):
             print(f"{i+1}. {row['ident']} - {row['name']} ({row['iso_region']}, {row['municipality']})")
-        
+
         try:
             choice = input("\nEnter number to select airport (or 'q' to quit): ")
             if choice.lower() == 'q':
                 return
-                
+
             choice = int(choice)
             if 1 <= choice <= len(matches):
                 selected = matches.iloc[choice-1]
                 station_id = selected['ident']
                 name = selected['name']
-                
+
                 # Get weather for selected airport
                 station_weather = get_station_weather([(station_id, name)])
                 print_station_forecasts(station_weather, browser=args.browser)
-                
+
                 # After showing weather, give options
                 while True:
                     print("\nOptions:")
@@ -1018,7 +1013,7 @@ def airport_search(args):
                     print("3. Return to main menu")
                     try:
                         choice = input("Enter your choice: ")
-                    
+
                         if choice == '1':
                             break  # Break out of options menu to show airport list again
                         elif choice == '2':
@@ -1030,10 +1025,10 @@ def airport_search(args):
                     except (KeyboardInterrupt, EOFError):
                         print("\n\nExiting the program... Goodbye!")
                         exit(0)
-                
+
                 # If we broke out of options menu with choice 1, continue outer loop
                 continue
-                
+
             print("Invalid choice. Please try again.")
         except ValueError:
             print("Please enter a valid number or 'q' to quit.")
@@ -1054,7 +1049,7 @@ def airport_download(args, print_results=True):
         print("Do you want to filter by airports that provide scheduled service?")
         try:
             filter_by_scheduled = input("Enter 1 for scheduled service, 2 for no: ").strip()
-        
+
             if filter_by_scheduled in ['1', '2']:
                 break
             else:
@@ -1086,12 +1081,16 @@ def airport_download(args, print_results=True):
                 (airports_df['ident'].str.len() == 4) &     # Has exactly 4 characters
                 (airports_df['ident'].str.isalpha())        # Contains only alphabetic characters
         ]
-            
+
             # Apply additional filter for scheduled service if the user selected option 1
             if filter_by_scheduled == '1':
                 filtered_airports_df = filtered_airports_df[filtered_airports_df['scheduled_service'] == 'yes']
 
-            filtered_airports_df.to_csv('airports_download.csv', index=False)
+            # Ensure filtered_airports_df is a DataFrame before calling to_csv
+            if isinstance(filtered_airports_df, pd.DataFrame):
+                filtered_airports_df.to_csv('airports_download.csv', index=False)
+            else:
+                print("Error: filtered_airports_df is not a DataFrame")
         spinner.succeed("Airport data downloaded successfully.")
 
     except Exception as e:
@@ -1129,7 +1128,7 @@ def airport_download(args, print_results=True):
 
 def main():
     import argparse
-    
+
     parser = argparse.ArgumentParser(description="Weather App using US Census & NOAA APIs")
     parser.add_argument('--browser', action='store_true',
                        help='Open weather station URLs in Chrome browser')
@@ -1158,7 +1157,7 @@ def main():
                 elif choice == '2':
                     airports_menu(args)
                 elif choice == '3':
-                    airport_download(args, print_results=True)
+                    airport_download(args, print_results=True)  # Ensure args is passed here
                 elif choice == '4':
                     airport_search(args)
                 elif choice == '5':
