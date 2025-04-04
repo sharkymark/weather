@@ -973,7 +973,7 @@ def airport_search(args):
         return
 
     # Sort by iso region, then municipality (second value in parentheses)
-    matches.sort_values(by=['iso_region', 'municipality', 'name'], ascending=[True,True,True])
+    matches = matches.sort_values(by=['iso_region', 'municipality', 'name'], ascending=[True,True,True])
 
     # Replace NaN values with "N/A" in the relevant columns
     matches.fillna({
@@ -1112,18 +1112,11 @@ def airport_download(args, print_results=True):
         finally:
             spinner.stop()
 
-        try:
-            spinner = Halo(text='Getting airport weather data from NOAA...', spinner='dots')
-            spinner.start()
-            random_airports_tuples = list(zip(random_airports['station_id'], airports_df['name']))
-            station_weather = get_station_weather(random_airports_tuples)
-            spinner.succeed("Airport weather data fetched successfully.")
-            print_station_forecasts(station_weather, browser=args.browser)
-        except Exception as e:
-            spinner.fail(f"Error getting airport weather data: {e}")
-            return None
-        finally:
-            spinner.stop()
+        random_airports_tuples = list(zip(random_airports['station_id'], airports_df['name']))
+        station_weather = get_station_weather(random_airports_tuples)
+        print_station_forecasts(station_weather, browser=args.browser)
+
+
 
 
 def main():
