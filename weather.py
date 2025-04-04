@@ -471,10 +471,7 @@ def get_station_weather(station_data):
             spinner.succeed(f"Metadata fetched for station {station_id}.")
         except Exception as e:
             spinner.fail(f"Failed to fetch metadata for station {station_id}: {e}")
-            station_payload['station_name'] = None
-            station_payload['timezone'] = None
-            station_payload['latitude'] = None
-            station_payload['longitude'] = None
+            continue  # Skip to the next station
         finally:
             spinner.stop()
 
@@ -614,22 +611,38 @@ def print_station_forecasts(station_weather, browser=False):
             print(f"https://forecast.weather.gov/MapClick.php?lat={station['latitude']}&lon={station['longitude']}")
             print("\n")
         
-
             if browser:
                 chrome_path = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
                 webbrowser.register('chrome', None, webbrowser.BackgroundBrowser(chrome_path))
-
                 chrome = webbrowser.get('chrome')
+
                 if chrome:
-                    subprocess.run([chrome_path, f"https://forecast.weather.gov/MapClick.php?lat={station['latitude']}&lon={station['longitude']}"], stdout=subprocess.DEVNULL)                    
-                    subprocess.run([chrome_path, station['airports_url']], stdout=subprocess.DEVNULL)
-                    subprocess.run([chrome_path, station['address_map_url']], stdout=subprocess.DEVNULL)
+                    # Open Zillow (county/state) URL
+                    county_state = get_county_state_from_latlon(station['latitude'], station['longitude'])
+                    if county_state:
+                        zillow_county_state_url = generate_zillow_urls(county_state)
+                        subprocess.run([chrome_path, zillow_county_state_url], stdout=subprocess.DEVNULL)
 
-            print_zillow(station['latitude'],station['longitude'],browser)    
+                    # Open Zillow (city/state) URL
+                    city_state = get_city_state_from_latlon(station['latitude'], station['longitude'])
+                    if city_state:
+                        zillow_city_state_url = generate_zillow_urls(city_state)
+                        subprocess.run([chrome_path, zillow_city_state_url], stdout=subprocess.DEVNULL)
 
+                    # Open 7-day NOAA forecast URL
+                    forecast_url = f"https://forecast.weather.gov/MapClick.php?lat={station['latitude']}&lon={station['longitude']}"
+                    subprocess.run([chrome_path, forecast_url], stdout=subprocess.DEVNULL)
+
+                    # Open Flightradar24 URL
+                    if station['airports_url']:
+                        subprocess.run([chrome_path, station['airports_url']], stdout=subprocess.DEVNULL)
+
+                    # Open Google Maps URL
+                    if station['address_map_url']:
+                        subprocess.run([chrome_path, station['address_map_url']], stdout=subprocess.DEVNULL)
 
     else:
-        print("Failed to retrieve weather for airports.")
+        print("No airport data available to print.")
 
 def airports_menu(args):
     
