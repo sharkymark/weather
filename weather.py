@@ -966,14 +966,14 @@ def airport_search(args):
         (airports_df['name'].str.upper().str.contains(search_regex)) |
         (airports_df['municipality'].str.upper().str.contains(search_regex)) |
         (airports_df['iso_region'].str.upper().str.contains(search_regex))
-    ]
+    ].copy()  # Explicitly create a copy to avoid SettingWithCopyWarning
 
     if matches.empty:
         print("No matching airports found.")
         return
 
     # Sort by iso region, then municipality (second value in parentheses)
-    matches.sort_values(by=['iso_region', 'municipality', 'name'], ascending=[True,True,True])
+    matches.sort_values(by=['iso_region', 'municipality', 'name'], ascending=True, inplace=True)
 
     # Replace NaN values with "N/A" in the relevant columns
     matches.fillna({
