@@ -61,7 +61,7 @@ Run the application:
 python weather.py
 ```
 
-To automatically open a Chrome web browser for weather, Google Maps, Flight, Zillow links:
+To automatically open a Chrome web browser for weather, Google Maps, Flight, Zillow links (macOS and Chrome only):
 ```bash
 python weather.py --browser
 ```
