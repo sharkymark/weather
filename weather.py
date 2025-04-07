@@ -26,6 +26,9 @@ def notify_api_key_status():
     else:
         print("\nNo Census API key found. Geocoding will proceed without it and with rate limits.")
 
+def notify_chrome_missing():
+    print("Google Chrome is not installed on your computer. Please download and install it to use the browser feature.")
+
 def load_addresses():
     """Loads previously entered addresses from a file."""
     if os.path.exists(ADDRESS_FILE):
@@ -575,6 +578,8 @@ def print_zillow(lat,lon, browser):
             chrome = webbrowser.get('chrome')
             if chrome:
                 subprocess.run([chrome_path, zillow_county_state_url], stdout=subprocess.DEVNULL)
+            else:
+                notify_chrome_missing()
 
     '''
     '''
@@ -591,6 +596,8 @@ def print_zillow(lat,lon, browser):
             chrome = webbrowser.get('chrome')
             if chrome:
                 subprocess.run([chrome_path, zillow_city_state_url], stdout=subprocess.DEVNULL)
+            else:
+                notify_chrome_missing()
 
 
 def print_station_forecasts(station_weather, browser=False):
@@ -626,24 +633,34 @@ def print_station_forecasts(station_weather, browser=False):
                     if county_state:
                         zillow_county_state_url = generate_zillow_urls(county_state)
                         subprocess.run([chrome_path, zillow_county_state_url], stdout=subprocess.DEVNULL)
+                    else:
+                        notify_chrome_missing()
 
                     # Open Zillow (city/state) URL
                     city_state = get_city_state_from_latlon(station['latitude'], station['longitude'])
                     if city_state:
                         zillow_city_state_url = generate_zillow_urls(city_state)
                         subprocess.run([chrome_path, zillow_city_state_url], stdout=subprocess.DEVNULL)
+                    else:
+                        notify_chrome_missing()
 
                     # Open 7-day NOAA forecast URL
                     forecast_url = f"https://forecast.weather.gov/MapClick.php?lat={station['latitude']}&lon={station['longitude']}"
                     subprocess.run([chrome_path, forecast_url], stdout=subprocess.DEVNULL)
+                else:
+                    notify_chrome_missing()
 
                     # Open Flightradar24 URL
                     if station['airports_url']:
                         subprocess.run([chrome_path, station['airports_url']], stdout=subprocess.DEVNULL)
+                    else:
+                        notify_chrome_missing()
 
                     # Open Google Maps URL
                     if station['address_map_url']:
                         subprocess.run([chrome_path, station['address_map_url']], stdout=subprocess.DEVNULL)
+                    else:
+                        notify_chrome_missing()
 
     else:
         print("No airport data available to print.")
@@ -773,6 +790,8 @@ def address_menu(args):
                 subprocess.run([chrome_path, f"https://forecast.weather.gov/MapClick.php?lat={latitude}&lon={longitude}"], stdout=subprocess.DEVNULL)
                 subprocess.run([chrome_path, address_map_url], stdout=subprocess.DEVNULL)
                 subprocess.run([chrome_path, zillow_url], stdout=subprocess.DEVNULL)
+            else:
+                notify_chrome_missing()
 
         while True:
             print("\nOptions:")
@@ -845,6 +864,8 @@ def address_menu(args):
                                 chrome = webbrowser.get('chrome')
                                 if chrome:
                                     subprocess.run([chrome_path, station['address_map_url']], stdout=subprocess.DEVNULL)
+                                else:
+                                    notify_chrome_missing()
                     else:
                         print("Failed to retrieve weather for nearest stations.")
                 elif choice == '5':
@@ -928,6 +949,8 @@ def address_menu(args):
                             subprocess.run([chrome_path, f"https://forecast.weather.gov/MapClick.php?lat={latitude}&lon={longitude}"], stdout=subprocess.DEVNULL)
                             subprocess.run([chrome_path, address_map_url], stdout=subprocess.DEVNULL)
                             subprocess.run([chrome_path, zillow_url], stdout=subprocess.DEVNULL)
+                        else:
+                            notify_chrome_missing()
                 elif choice == '7':
                     print("\n Returning to main menu...")
                     return
@@ -1119,16 +1142,20 @@ def airport_download(args, print_results=True):
 
 def main():
     import argparse
+    import platform
 
     parser = argparse.ArgumentParser(description="Weather App using US Census & NOAA APIs")
     parser.add_argument('--browser', action='store_true',
-                       help='Open weather station URLs in Chrome browser')
+                       help='Open weather station URLs in Chrome browser (macOS only)')
     args = parser.parse_args()
-
-
 
     print("Welcome to the Weather App!")
     print("This app uses the US Census & NOAA APIs")
+
+    # Check if --browser is enabled on a non-macOS platform
+    if args.browser and platform.system() != 'Darwin':
+        print("\nNote: The --browser option is only supported on macOS. This option will be ignored.")
+        args.browser = False
 
     notify_api_key_status()
 
