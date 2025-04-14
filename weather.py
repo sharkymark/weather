@@ -692,16 +692,12 @@ def airports_menu(args):
         else:
             spinner.succeed("Airports filtered successfully.")
 
-        spinner = Halo(text='Getting airport weather data from NOAA...', spinner='dots')
-        spinner.start()
         station_weather = get_station_weather(station_data)
         spinner.succeed("Airport weather data fetched successfully.")
         print_station_forecasts(station_weather, browser=args.browser)
     except Exception as e:
-        spinner.fail(f"Error getting airport weather data: {e}")
+        print(f"Error getting airport weather data: {e}")
         return None
-    finally:
-        spinner.stop()
 
 def address_menu(args):
     try:
