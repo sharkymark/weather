@@ -30,6 +30,8 @@ A Python command-line application that provides comprehensive weather informatio
 - **Open Chrome browser**: to view Google Maps location, Zillow, and FlightTrader24 of airport
    - **Optional**: to enable this feature, pass `python3 weather.py --browser` flag when starting the app
 
+> Note: The API endpoints are free to use, but please be mindful of the usage limits. If you exceed the limits, you may be temporarily blocked from making requests. Use a VPN to get around this if you are blocked.
+
 ## Requirements
 
 - Python 3.8+
