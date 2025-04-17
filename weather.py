@@ -18,7 +18,7 @@ import argparse
 import platform
 
 ADDRESS_FILE = "addresses.txt"
-CENSUS_API_BASE_URL = "https://geocoding.geo.census.gov/geocoder/locations/onelineaddress"
+CENSUS_API_BASE_URL = "https://nominatim.openstreetmap.org/search"
 CENSUS_API_KEY = os.getenv("CENSUS_API_KEY")
 
 def notify_api_key_status():
@@ -46,11 +46,10 @@ def save_addresses(addresses):
 
 def geocode_address(address):
     """
-    Geocodes an address using the US Census Geocoder API.
+    Geocodes an address using the Nominatim Geocoder API.
 
     URLs:
-    https://geocoding.geo.census.gov/geocoder/locations/onelineaddress
-    https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?address=4600+Silver+Hill+Rd%2C+Washington%2C+DC+20233&benchmark=4&format=json
+    https://nominatim.openstreetmap.org/search
 
     Args:
       address: The street address to geocode.
@@ -59,12 +58,9 @@ def geocode_address(address):
       A tuple containing (latitude, longitude) or None if geocoding fails.
     """
     params = {
-        "address": address,
-        "benchmark": "Public_AR_Current",
+        "q": address,
         "format": "json",
     }
-    if CENSUS_API_KEY:
-        params["key"] = CENSUS_API_KEY
 
     spinner = Halo(text='Geocoding address...', spinner='dots')
     try:
@@ -72,17 +68,16 @@ def geocode_address(address):
         response = requests.get(CENSUS_API_BASE_URL, params=params)
         response.raise_for_status()  # Raise HTTPError for bad responses (4xx or 5xx)
         data = response.json()
-        if data['result']['addressMatches']:
-            match = data['result']['addressMatches'][0]
-            latitude = match['coordinates']['y']
-            longitude = match['coordinates']['x']
+        if data:
+            latitude = data[0]['lat']
+            longitude = data[0]['lon']
             spinner.succeed("Address geocoded successfully.")
-            return float(latitude), float(longitude), match['matchedAddress']
+            return float(latitude), float(longitude), address
         else:
             spinner.fail("Address could not be matched.")
             return None, None, None
     except requests.exceptions.RequestException as e:
-        spinner.fail(f"Error during Census API request: {e}")
+        spinner.fail(f"Error during Nominatim API request: {e}")
         return None, None, None
     finally:
         spinner.stop()
