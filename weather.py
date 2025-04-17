@@ -60,12 +60,16 @@ def geocode_address(address):
     params = {
         "q": address,
         "format": "json",
+        "limit": 1
     }
 
     spinner = Halo(text='Geocoding address...', spinner='dots')
     try:
         spinner.start()
-        response = requests.get(CENSUS_API_BASE_URL, params=params)
+        headers = {
+        'User-Agent': 'Goose-Weather-App/1.0'
+    }
+        response = requests.get(CENSUS_API_BASE_URL, params=params, headers=headers, verify=False)
         response.raise_for_status()  # Raise HTTPError for bad responses (4xx or 5xx)
         data = response.json()
         if data:
