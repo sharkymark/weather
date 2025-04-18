@@ -21,6 +21,8 @@ ADDRESS_FILE = "addresses.txt"
 NOMINATIM_API_BASE_URL = "https://nominatim.openstreetmap.org/search"
 CENSUS_API_BASE_URL = "https://geocoding.geo.census.gov/geocoder/locations/onelineaddress"
 CENSUS_API_KEY = os.getenv("CENSUS_API_KEY")
+NOMINATIM_REVERSE_URL = "https://nominatim.openstreetmap.org/reverse"
+CENSUS_REVERSE_URL = "https://geocoding.geo.census.gov/geocoder/geographies/coordinates"
 
 def notify_api_key_status(args):
     """Notify if a US Census API key is found."""
@@ -156,55 +158,80 @@ def get_county_state_from_latlon(latitude, longitude):
     finally:
         spinner.stop()
 
-def get_city_state_from_latlon(latitude, longitude):
+def get_city_state_from_latlon(latitude, longitude, use_census_api=False):
     """
-    Gets city from latitude and longitude using US Census API.
+    Gets city from latitude and longitude using Nominatim API by default, US Census API if census is set.
 
     Args:
         latitude: The latitude of the location.
         longitude: The longitude of the location.
+        use_census_api: use census api
 
     Returns:
         city and state as string or None if not found.
-
-    Example:
-    https://geocoding.geo.census.gov/geocoder/geographies/coordinates?x=-156.05056&y=19.74083&benchmark=Public_AR_Current&vintage=Current_Current&format=json
-
     """
     spinner = Halo(text='Reverse geocoding lat lon for city and state...', spinner='dots')
     try:
         spinner.start()
-        url = f"https://geocoding.geo.census.gov/geocoder/geographies/coordinates?x={longitude}&y={latitude}&benchmark=Public_AR_Current&vintage=Current_Current&format=json"
-        response = requests.get(url)
-        response.raise_for_status()
-        data = response.json()
-        try:
-            city = data['result']['geographies']['Incorporated Places'][0]['BASENAME']
-        except (KeyError, IndexError):
-            city = None
-        try:
-            state = data['result']['geographies']['States'][0]['BASENAME']
-        except (KeyError, IndexError):
-            state = None
-        try:
-            city_state = data['result']['geographies']['Urban Areas'][0]['BASENAME']
-        except (KeyError, IndexError):
-            city_state = None
-        try:
-            county_city = data['result']['geographies']['County Subdivisions'][0]['BASENAME']
-        except (KeyError, IndexError):
-            county_city = None
+        headers = {
+            'User-Agent': 'Weather-App/1.0'
+        }
+        
+        if use_census_api:
+            url = f"{CENSUS_REVERSE_URL}?x={longitude}&y={latitude}&benchmark=Public_AR_Current&vintage=Current_Current&format=json"
+            response = requests.get(url)
+            response.raise_for_status()
+            data = response.json()
 
-        if city_state:
-            spinner.succeed("City and state received successfully")
-            return city_state
-        if city and state:  # Check if city and state are not empty
-            spinner.succeed("City and state received successfully")
-            return city + "-" + state
-        if county_city:
-            spinner.succeed("City and state received successfully")
-            return county_city + "-" + state
+            try:
+                city = data['result']['geographies']['Incorporated Places'][0]['BASENAME']
+            except (KeyError, IndexError, TypeError):
+                city = None
+            try:
+                state = data['result']['geographies']['States'][0]['BASENAME']
+            except (KeyError, IndexError, TypeError):
+                state = None
+            try: 
+                city_state = data['result']['geographies']['Urban Areas'][0]['BASENAME']
+            except (KeyError, IndexError, TypeError):
+                city_state = None
+            try:
+                county_city = data['result']['geographies']['County Subdivisions'][0]['BASENAME']
+            except (KeyError, IndexError, TypeError):
+                county_city = None
+
+            if city_state:
+                spinner.succeed("City and state received successfully")
+                return city_state
+            if city and state:
+                spinner.succeed("City and state received successfully")
+                return city + "-" + state
+            if county_city and state:
+                spinner.succeed("City and state received successfully")
+                return county_city + "-" + state
+            spinner.fail("No city and state found for these coordinates")
+            return None
         else:
+            url = f"{NOMINATIM_REVERSE_URL}?format=jsonv2&lat={latitude}&lon={longitude}"
+            response = requests.get(url, headers=headers)
+            response.raise_for_status()
+            data = response.json()
+
+            if not isinstance(data, dict) or 'address' not in data:
+                spinner.fail("Invalid response data format")
+                return None
+
+            try:
+                city = data['address'].get('city') or data['address'].get('town') or data['address'].get('village')
+                state = data['address'].get('state')
+            except (KeyError, TypeError, AttributeError):
+                spinner.fail("Error extracting city/state from response")
+                return None
+
+            if city and state:
+                city_state = f"{city}-{state}"
+                spinner.succeed("City and state received successfully")
+                return city_state
             spinner.fail("No city and state found for these coordinates")
             return None
     except Exception as e:
@@ -589,7 +616,7 @@ def get_station_weather(station_data):
 
     return station_weather
 
-def print_zillow(lat,lon, browser):
+def print_zillow(lat, lon, browser, census):
 
     # Get county and state and generate Zillow URL
     county_state = get_county_state_from_latlon(lat, lon)
@@ -607,10 +634,8 @@ def print_zillow(lat,lon, browser):
             else:
                 notify_chrome_missing()
 
-    '''
-    '''
     # Get city and state and generate Zillow URL
-    city_state = get_city_state_from_latlon(lat, lon)
+    city_state = get_city_state_from_latlon(lat, lon, use_census_api=census)
     if city_state:
         zillow_city_state_url = generate_zillow_urls(city_state)
         print(f"\nZillow URL for {city_state}:")
@@ -625,8 +650,7 @@ def print_zillow(lat,lon, browser):
             else:
                 notify_chrome_missing()
 
-
-def print_station_forecasts(station_weather, browser=False):
+def print_station_forecasts(station_weather, browser=False, census=False):
     if station_weather:
         print("\n\nAirport Weather Conditions:\n")
 
@@ -647,7 +671,7 @@ def print_station_forecasts(station_weather, browser=False):
             print("\n")
             print(f"https://forecast.weather.gov/MapClick.php?lat={station['latitude']}&lon={station['longitude']}")
             print("\n")
-            print_zillow(station['latitude'], station['longitude'], browser)
+            print_zillow(station['latitude'], station['longitude'], browser, census)
 
             if browser:
                 chrome_path = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
@@ -718,7 +742,7 @@ def airports_menu(args):
 
         station_weather = get_station_weather(station_data)
         spinner.succeed("Airport weather data fetched successfully.")
-        print_station_forecasts(station_weather, browser=args.browser)
+        print_station_forecasts(station_weather, browser=args.browser, census=args.census)
     except Exception as e:
         print(f"Error getting airport weather data: {e}")
         return None
@@ -1035,7 +1059,7 @@ def airport_search(args):
 
                 # Get weather for selected airport
                 station_weather = get_station_weather([(station_id, name)])
-                print_station_forecasts(station_weather, browser=args.browser)
+                print_station_forecasts(station_weather, browser=args.browser, census=args.census)
 
                 # After showing weather, give options
                 while True:
@@ -1146,7 +1170,7 @@ def airport_download(args, print_results=True):
 
             random_airports_tuples = list(zip(random_airports['station_id'], airports_df['name']))
             station_weather = get_station_weather(random_airports_tuples)
-            print_station_forecasts(station_weather, browser=args.browser)
+            print_station_forecasts(station_weather, browser=args.browser, census=args.census)
 
 
 def main():
