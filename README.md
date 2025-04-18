@@ -1,6 +1,6 @@
 # Weather Application
 
-A Python command-line application that provides comprehensive weather information using the NOAA Weather API and US Census Geocoder API.
+A Python command-line application that provides comprehensive weather information using the NOAA Weather API and Nominatim Geocoder API. (Note: The application can also use the US Census Geocoder API for geocoding if desired.)
 
 ## Features
 
@@ -84,6 +84,14 @@ Follow the on-screen prompts to:
 4. Prompt user to filter airports by code, name, state and municipality
 5. Exit the application
 
+## APIs
+
+This application uses:
+- Nominatim Geocoder and Reverse Geocoder API
+- NOAA Weather API (no key required)
+
+If you want to use the US Census Geocoder API, use the argument `--census` when running the application. This will use the US Census Geocoder API for geocoding instead of Nominatim.
+
 ## Environment Variables
 
 - `CENSUS_API_KEY` (optional): API key for the US Census Geocoder API. If provided, it will be used for geocoding requests to improve reliability and avoid rate limits. Set this variable in your environment before running the application.
@@ -96,12 +104,6 @@ python weather.py
 ```
 
 If the API key is not set, the application will notify you and proceed without it.
-
-## API Keys
-
-This application uses:
-- US Census Geocoder API (no key required)
-- NOAA Weather API (no key required)
 
 ## File Structure
 

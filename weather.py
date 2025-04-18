@@ -18,15 +18,19 @@ import argparse
 import platform
 
 ADDRESS_FILE = "addresses.txt"
+NOMINATIM_API_BASE_URL = "https://nominatim.openstreetmap.org/search"
 CENSUS_API_BASE_URL = "https://geocoding.geo.census.gov/geocoder/locations/onelineaddress"
 CENSUS_API_KEY = os.getenv("CENSUS_API_KEY")
+NOMINATIM_REVERSE_URL = "https://nominatim.openstreetmap.org/reverse"
+CENSUS_REVERSE_URL = "https://geocoding.geo.census.gov/geocoder/geographies/coordinates"
 
-def notify_api_key_status():
+def notify_api_key_status(args):
     """Notify if a US Census API key is found."""
-    if CENSUS_API_KEY:
-        print("\nUS Census API key found and will be used for geocoding API calls.")
-    else:
-        print("\nNo Census API key found. Geocoding will proceed without it and with rate limits.")
+    if args.census:
+        if CENSUS_API_KEY:
+            print("\nUS Census API key found and will be used larger rate limits.")
+        else:
+            print("\nNo Census API key found. Geocoding will proceed without it and with rate limits.")
 
 def notify_chrome_missing():
     print("Google Chrome is not installed on your computer. Please download and install it to use the browser feature.")
@@ -44,13 +48,9 @@ def save_addresses(addresses):
         for address in addresses:
             f.write(address + "\n")
 
-def geocode_address(address):
+def geocode_address(address, use_census_api=False):
     """
-    Geocodes an address using the US Census Geocoder API.
-
-    URLs:
-    https://geocoding.geo.census.gov/geocoder/locations/onelineaddress
-    https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?address=4600+Silver+Hill+Rd%2C+Washington%2C+DC+20233&benchmark=4&format=json
+    Geocodes an address using either Nominatim or US Census Geocoder API.
 
     Args:
       address: The street address to geocode.
@@ -58,20 +58,42 @@ def geocode_address(address):
     Returns:
       A tuple containing (latitude, longitude) or None if geocoding fails.
     """
-    params = {
-        "address": address,
-        "benchmark": "Public_AR_Current",
-        "format": "json",
-    }
-    if CENSUS_API_KEY:
-        params["key"] = CENSUS_API_KEY
+    if use_census_api:
+        api_base_url = CENSUS_API_BASE_URL
+        params = {
+            "address": address,
+            "benchmark": "Public_AR_Current",
+            "format": "json",
+        }
+        if CENSUS_API_KEY:
+            params["key"] = CENSUS_API_KEY
+        api_name = "Census"
+    else:
+        api_base_url = NOMINATIM_API_BASE_URL
+        params = {
+            "q": address,
+            "format": "json",
+            "limit": 1
+        }
+        api_name = "Nominatim"
 
-    spinner = Halo(text='Geocoding address...', spinner='dots')
+    spinner = Halo(text=f'Geocoding address using {api_name}...', spinner='dots')
     try:
         spinner.start()
-        response = requests.get(CENSUS_API_BASE_URL, params=params)
-        response.raise_for_status()  # Raise HTTPError for bad responses (4xx or 5xx)
+        headers = {
+            'User-Agent': 'Weather-App/1.0'
+        }
+        response = requests.get(api_base_url, params=params, headers=headers)
+        response.raise_for_status()
         data = response.json()
+
+    except requests.exceptions.RequestException as e:
+        spinner.fail(f"Error during {api_name} API request: {e}")
+        return None, None, None
+    finally:
+        spinner.stop()
+
+    if use_census_api:
         if data['result']['addressMatches']:
             match = data['result']['addressMatches'][0]
             latitude = match['coordinates']['y']
@@ -81,11 +103,15 @@ def geocode_address(address):
         else:
             spinner.fail("Address could not be matched.")
             return None, None, None
-    except requests.exceptions.RequestException as e:
-        spinner.fail(f"Error during Census API request: {e}")
-        return None, None, None
-    finally:
-        spinner.stop()
+    else:
+        if data:
+            latitude = data[0]['lat']
+            longitude = data[0]['lon']
+            spinner.succeed("Address geocoded successfully.")
+            return float(latitude), float(longitude), address
+        else:
+            spinner.fail("Address could not be matched.")
+            return None, None, None
 
 def generate_google_maps_url(latitude, longitude, label):
     """
@@ -132,55 +158,80 @@ def get_county_state_from_latlon(latitude, longitude):
     finally:
         spinner.stop()
 
-def get_city_state_from_latlon(latitude, longitude):
+def get_city_state_from_latlon(latitude, longitude, use_census_api=False):
     """
-    Gets city from latitude and longitude using US Census API.
+    Gets city from latitude and longitude using Nominatim API by default, US Census API if census is set.
 
     Args:
         latitude: The latitude of the location.
         longitude: The longitude of the location.
+        use_census_api: use census api
 
     Returns:
         city and state as string or None if not found.
-
-    Example:
-    https://geocoding.geo.census.gov/geocoder/geographies/coordinates?x=-156.05056&y=19.74083&benchmark=Public_AR_Current&vintage=Current_Current&format=json
-
     """
     spinner = Halo(text='Reverse geocoding lat lon for city and state...', spinner='dots')
     try:
         spinner.start()
-        url = f"https://geocoding.geo.census.gov/geocoder/geographies/coordinates?x={longitude}&y={latitude}&benchmark=Public_AR_Current&vintage=Current_Current&format=json"
-        response = requests.get(url)
-        response.raise_for_status()
-        data = response.json()
-        try:
-            city = data['result']['geographies']['Incorporated Places'][0]['BASENAME']
-        except (KeyError, IndexError):
-            city = None
-        try:
-            state = data['result']['geographies']['States'][0]['BASENAME']
-        except (KeyError, IndexError):
-            state = None
-        try:
-            city_state = data['result']['geographies']['Urban Areas'][0]['BASENAME']
-        except (KeyError, IndexError):
-            city_state = None
-        try:
-            county_city = data['result']['geographies']['County Subdivisions'][0]['BASENAME']
-        except (KeyError, IndexError):
-            county_city = None
+        headers = {
+            'User-Agent': 'Weather-App/1.0'
+        }
+        
+        if use_census_api:
+            url = f"{CENSUS_REVERSE_URL}?x={longitude}&y={latitude}&benchmark=Public_AR_Current&vintage=Current_Current&format=json"
+            response = requests.get(url)
+            response.raise_for_status()
+            data = response.json()
 
-        if city_state:
-            spinner.succeed("City and state received successfully")
-            return city_state
-        if city and state:  # Check if city and state are not empty
-            spinner.succeed("City and state received successfully")
-            return city + "-" + state
-        if county_city:
-            spinner.succeed("City and state received successfully")
-            return county_city + "-" + state
+            try:
+                city = data['result']['geographies']['Incorporated Places'][0]['BASENAME']
+            except (KeyError, IndexError, TypeError):
+                city = None
+            try:
+                state = data['result']['geographies']['States'][0]['BASENAME']
+            except (KeyError, IndexError, TypeError):
+                state = None
+            try: 
+                city_state = data['result']['geographies']['Urban Areas'][0]['BASENAME']
+            except (KeyError, IndexError, TypeError):
+                city_state = None
+            try:
+                county_city = data['result']['geographies']['County Subdivisions'][0]['BASENAME']
+            except (KeyError, IndexError, TypeError):
+                county_city = None
+
+            if city_state:
+                spinner.succeed("City and state received successfully")
+                return city_state
+            if city and state:
+                spinner.succeed("City and state received successfully")
+                return city + "-" + state
+            if county_city and state:
+                spinner.succeed("City and state received successfully")
+                return county_city + "-" + state
+            spinner.fail("No city and state found for these coordinates")
+            return None
         else:
+            url = f"{NOMINATIM_REVERSE_URL}?format=jsonv2&lat={latitude}&lon={longitude}"
+            response = requests.get(url, headers=headers)
+            response.raise_for_status()
+            data = response.json()
+
+            if not isinstance(data, dict) or 'address' not in data:
+                spinner.fail("Invalid response data format")
+                return None
+
+            try:
+                city = data['address'].get('city') or data['address'].get('town') or data['address'].get('village')
+                state = data['address'].get('state')
+            except (KeyError, TypeError, AttributeError):
+                spinner.fail("Error extracting city/state from response")
+                return None
+
+            if city and state:
+                city_state = f"{city}-{state}"
+                spinner.succeed("City and state received successfully")
+                return city_state
             spinner.fail("No city and state found for these coordinates")
             return None
     except Exception as e:
@@ -565,7 +616,7 @@ def get_station_weather(station_data):
 
     return station_weather
 
-def print_zillow(lat,lon, browser):
+def print_zillow(lat, lon, browser, census):
 
     # Get county and state and generate Zillow URL
     county_state = get_county_state_from_latlon(lat, lon)
@@ -583,10 +634,8 @@ def print_zillow(lat,lon, browser):
             else:
                 notify_chrome_missing()
 
-    '''
-    '''
     # Get city and state and generate Zillow URL
-    city_state = get_city_state_from_latlon(lat, lon)
+    city_state = get_city_state_from_latlon(lat, lon, use_census_api=census)
     if city_state:
         zillow_city_state_url = generate_zillow_urls(city_state)
         print(f"\nZillow URL for {city_state}:")
@@ -601,8 +650,7 @@ def print_zillow(lat,lon, browser):
             else:
                 notify_chrome_missing()
 
-
-def print_station_forecasts(station_weather, browser=False):
+def print_station_forecasts(station_weather, browser=False, census=False):
     if station_weather:
         print("\n\nAirport Weather Conditions:\n")
 
@@ -623,7 +671,7 @@ def print_station_forecasts(station_weather, browser=False):
             print("\n")
             print(f"https://forecast.weather.gov/MapClick.php?lat={station['latitude']}&lon={station['longitude']}")
             print("\n")
-            print_zillow(station['latitude'], station['longitude'], browser)
+            print_zillow(station['latitude'], station['longitude'], browser, census)
 
             if browser:
                 chrome_path = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
@@ -694,7 +742,7 @@ def airports_menu(args):
 
         station_weather = get_station_weather(station_data)
         spinner.succeed("Airport weather data fetched successfully.")
-        print_station_forecasts(station_weather, browser=args.browser)
+        print_station_forecasts(station_weather, browser=args.browser, census=args.census)
     except Exception as e:
         print(f"Error getting airport weather data: {e}")
         return None
@@ -702,6 +750,9 @@ def airports_menu(args):
 def address_menu(args):
     try:
         stored_addresses = load_addresses()
+        latitude = None
+        longitude = None
+        matched_address = None
 
         if stored_addresses:
             # Sort addresses by state code (assumes state code is the second-to-last element in the address)
@@ -732,7 +783,7 @@ def address_menu(args):
         else:
             address = input("\nEnter a street address: ")
 
-        latitude, longitude, matched_address = geocode_address(address)
+        latitude, longitude, matched_address = geocode_address(address, use_census_api=args.census)
 
         if latitude is None or longitude is None:
             print("\nAddress not found. Please try again.\n")
@@ -1008,7 +1059,7 @@ def airport_search(args):
 
                 # Get weather for selected airport
                 station_weather = get_station_weather([(station_id, name)])
-                print_station_forecasts(station_weather, browser=args.browser)
+                print_station_forecasts(station_weather, browser=args.browser, census=args.census)
 
                 # After showing weather, give options
                 while True:
@@ -1119,7 +1170,7 @@ def airport_download(args, print_results=True):
 
             random_airports_tuples = list(zip(random_airports['station_id'], airports_df['name']))
             station_weather = get_station_weather(random_airports_tuples)
-            print_station_forecasts(station_weather, browser=args.browser)
+            print_station_forecasts(station_weather, browser=args.browser, census=args.census)
 
 
 def main():
@@ -1128,17 +1179,28 @@ def main():
     parser = argparse.ArgumentParser(description="Weather App using US Census & NOAA APIs")
     parser.add_argument('--browser', action='store_true',
                        help='Open weather station URLs in Chrome browser (macOS only)')
+    parser.add_argument('--census', action='store_true',
+                        help='Use US Census API for geocoding')
     args = parser.parse_args()
 
+
     print("Welcome to the Weather App!")
-    print("This app uses the US Census & NOAA APIs")
+    print("\nThis app uses the following APIs:")
+
+    if args.census:
+        geocode="US Census"
+    else:
+        geocode="Nominatim"
+
+    print(f"- {geocode} API for geocoding an address")
+    print("- NOAA API for weather data")
 
     # Check if --browser is enabled on a non-macOS platform
     if args.browser and platform.system() != 'Darwin':
         print("\nNote: The --browser option is only supported on macOS. This option will be ignored.")
         args.browser = False
 
-    notify_api_key_status()
+    notify_api_key_status(args)
 
     try:
         while True:
