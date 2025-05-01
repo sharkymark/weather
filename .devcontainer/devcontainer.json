@@ -5,23 +5,22 @@
         "context": ".."
     },
     "containerEnv": {
-        "CENSUS_API_KEY": "${localEnv:CENSUS_API_KEY}"
-      },    
+        "CENSUS_API_KEY": "${localEnv:CENSUS_API_KEY}",
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${localEnv:GITHUB_PERSONAL_ACCESS_TOKEN}"
+      }, 
+    "features": {
+        // https://github.com/devcontainers/features/tree/main/src
+        "ghcr.io/devcontainers/features/github-cli:1": {}
+    }, 
     "customizations": {
         "vscode": {
             "extensions": [
                 "ms-python.python",
-                "ms-python.vscode-pylance"
-            ],
-            "settings": {
-                "python.defaultInterpreterPath": "/usr/local/bin/python3",
-                "python.linting.enabled": true,
-                "python.formatting.provider": "black"
-            }
+                "ms-python.vscode-pylance",
+                "github.copilot"
+            ]
         }
     },
-    "runArgs": [
-        "--add-host=host.docker.internal:host-gateway"
-    ],
+    "postCreateCommand": "echo \"${GITHUB_PERSONAL_ACCESS_TOKEN}\" | gh auth login --with-token && echo 'Authentication successful'",
     "postStartCommand": "python3 weather.py"
 } 
