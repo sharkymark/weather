@@ -21,6 +21,6 @@
             ]
         }
     },
-    "postCreateCommand": "echo \"${GITHUB_PERSONAL_ACCESS_TOKEN}\" | gh auth login --with-token && echo 'Authentication successful' && git config --global --add safe.directory \"$(git rev-parse --show-toplevel)\"",
-    "postStartCommand": "python3 weather.py"
+    "postCreateCommand": "echo \"${GITHUB_PERSONAL_ACCESS_TOKEN}\" | gh auth login --with-token && echo 'Authentication successful' && git config --global --add safe.directory \"$(git rev-parse --show-toplevel)\" &",
+    "postStartCommand": "python3 weather.py &"
 } 
