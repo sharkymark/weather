@@ -124,6 +124,18 @@ weather/
 └── airports_dowload.csv   # Stores airport codes for random weather lookup
 ```
 
+## Resources
+
+- [NOAA Weather API Documentation](https://www.weather.gov/documentation/services-web-api)
+
+- [Nominatim Geocoder API Documentation](https://nominatim.org/release-docs/develop/api/Search/)
+
+- [US Census Geocoder API Documentation](https://www.census.gov/data/developers/data-sets/Geocoding-services.html)
+
+- [pytest Documentation](https://docs.pytest.org/en/stable/)
+
+- [Airport Codes CSV](https://davidmegginson.github.io/ourairports-data/)
+
 ## Contributing
 
 Contributions are welcome! Please open an issue or pull request.
