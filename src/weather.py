@@ -17,7 +17,7 @@ from urllib.parse import quote_plus
 import argparse
 import platform
 
-ADDRESS_FILE = "addresses.txt"
+ADDRESS_FILE = "data/addresses.txt"
 NOMINATIM_API_BASE_URL = "https://nominatim.openstreetmap.org/search"
 CENSUS_API_BASE_URL = "https://geocoding.geo.census.gov/geocoder/locations/onelineaddress"
 CENSUS_API_KEY = os.getenv("CENSUS_API_KEY")
@@ -704,7 +704,7 @@ def airports_menu(args):
     spinner = Halo(text='Reading airport data from file...', spinner='dots')
     spinner.start()
     try:
-        with open('airports.txt', 'r') as file:
+        with open('data/airports.txt', 'r') as file:
             station_ids = []
             for line in file:
                 line = line.strip()
@@ -999,12 +999,12 @@ def address_menu(args):
 def airport_search(args):
     """Search airports by wildcard"""
     # Check if airports_download.csv exists
-    if not os.path.exists('airports_download.csv'):
+    if not os.path.exists('data/airports_download.csv'):
         print("Airport database not found. Downloading...")
         airport_download(args, print_results=False)  # Include args here
 
     # Load airport data
-    airports_df = pd.read_csv('airports_download.csv')
+    airports_df = pd.read_csv('data/airports_download.csv')
 
     # Get search term
     try:
@@ -1125,7 +1125,7 @@ def airport_download(args, print_results=True):
         # Download the CSV file
         with urllib.request.urlopen(airports_url, context=ssl_context) as response:
             csv_content = response.read()
-            with open('airports_download.csv', 'wb') as file:
+            with open('data/airports_download.csv', 'wb') as file:
                 file.write(csv_content)
             airports_df = pd.read_csv(io.StringIO(csv_content.decode('utf-8')))
 
@@ -1144,7 +1144,7 @@ def airport_download(args, print_results=True):
 
             # Ensure filtered_airports_df is a DataFrame before calling to_csv
             if isinstance(filtered_airports_df, pd.DataFrame):
-                filtered_airports_df.to_csv('airports_download.csv', index=False)
+                filtered_airports_df.to_csv('data/airports_download.csv', index=False)
             else:
                 print("Error: filtered_airports_df is not a DataFrame")
         spinner.succeed("Airport data downloaded successfully.")
