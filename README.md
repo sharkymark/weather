@@ -127,6 +127,18 @@ weather/
 └── .gitignore             # Git ignore file
 ```
 
+## Unit Testing
+
+This project uses `pytest` for running tests and `unittest.mock` for creating mock objects to simulate API calls and other external dependencies. This allows for isolated testing of individual functions and components.
+
+To run the tests, navigate to the project's root directory in your terminal (where `requirements.txt` is located) and execute:
+
+```bash
+pytest
+```
+
+This command will automatically discover and run all tests located in the `tests/` directory.
+
 ## Resources
 
 - [NOAA Weather API Documentation](https://www.weather.gov/documentation/services-web-api)
