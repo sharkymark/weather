@@ -92,7 +92,7 @@ def test_generate_zillow_urls():
     assert generate_zillow_urls(arg_zip) == expected_url_zip
 
     arg_city_state = "Beverly Hills-CA"
-    expected_url_city_state = "https://www.zillow.com/homes/for_sale/Beverly%20Hills-CA"
+    expected_url_city_state = "https://www.zillow.com/homes/for_sale/Beverly+Hills-CA"
     assert generate_zillow_urls(arg_city_state) == expected_url_city_state
 
 # Test for generate_flightradar24_url
@@ -102,55 +102,58 @@ def test_generate_flightradar24_url():
     assert generate_flightradar24_url(station_id) == expected_url
 
 # Tests for load_addresses and save_addresses
-def test_load_and_save_addresses(tmp_path):
+def test_load_and_save_addresses(tmp_path, monkeypatch): # Add monkeypatch here
     # Override DATA_DIR and ADDRESS_FILE for testing purposes
     # This is a bit tricky as they are global in weather.py
     # A better approach would be to pass them as arguments or use a config object
     # For now, we'll work with the global by ensuring the test file is in the right place
     
-    original_data_dir = DATA_DIR
-    original_address_file = ADDRESS_FILE
+    # This test verifies file operations that depend on DATA_DIR and ADDRESS_FILE globals.
+    # It uses monkeypatch.chdir to ensure that relative paths are resolved within tmp_path.
     
-    # Point to tmp_path for test isolation
-    test_data_dir = tmp_path / "data"
-    test_data_dir.mkdir()
-    
-    # Dynamically update the globals in the weather module for this test
-    # This is generally not recommended but necessary here due to module structure
+    # Import weather module locally to access its globals if needed for setup,
+    # but the functions load_addresses and save_addresses will use the module's own globals.
     import weather
-    weather.DATA_DIR = str(test_data_dir.parent) # DATA_DIR is "data", so parent is tmp_path
-    weather.ADDRESS_FILE = "addresses.txt" # ADDRESS_FILE is just the filename
 
-    test_address_file_path = test_data_dir / weather.ADDRESS_FILE
+    # Define the expected path for the data subdirectory within tmp_path
+    # weather.DATA_DIR is "data", weather.ADDRESS_FILE is "addresses.txt"
+    data_subdir_in_tmp = tmp_path / weather.DATA_DIR
+    data_subdir_in_tmp.mkdir() # Create "data" subdirectory in tmp_path
 
-    # Test load_addresses when file doesn't exist
+    # Change current working directory to tmp_path for the scope of this test
+    # This makes os.path.join(weather.DATA_DIR, weather.ADDRESS_FILE) resolve to
+    # tmp_path / "data" / "addresses.txt"
+    monkeypatch.chdir(tmp_path)
+
+    # Test load_addresses when file (tmp_path/data/addresses.txt) doesn't exist
     assert load_addresses() == []
 
     # Test save_addresses and then load_addresses
     addresses_to_save = ["123 Main St, Anytown, USA", "456 Oak Ave, Otherville, USA"]
-    save_addresses(addresses_to_save)
+    save_addresses(addresses_to_save) # Should write to tmp_path/data/addresses.txt
 
-    assert test_address_file_path.exists()
+    expected_file_path = data_subdir_in_tmp / weather.ADDRESS_FILE
+    assert expected_file_path.exists()
     
-    loaded_addresses = load_addresses()
+    loaded_addresses = load_addresses() # Should read from tmp_path/data/addresses.txt
     assert loaded_addresses == addresses_to_save
 
     # Test saving empty list (should effectively clear the file or write nothing)
     save_addresses([])
     assert load_addresses() == [] # Or check if file is empty
 
-    # Restore original globals (important if other tests in the same session rely on them)
-    # This might not be perfectly clean if tests run in parallel or specific order.
-    weather.DATA_DIR = original_data_dir
-    weather.ADDRESS_FILE = original_address_file
+    # monkeypatch.chdir is automatically undone after the test.
+    # No need to manually restore weather.DATA_DIR or weather.ADDRESS_FILE
+    # as we are testing their default behavior in a controlled CWD.
 
 def test_load_addresses_file_not_found(monkeypatch, tmp_path):
     # Ensure DATA_DIR points to a temporary directory for this test
     # and ADDRESS_FILE is a file that won't exist initially.
+    import weather # Import here to ensure monkeypatch targets the correct module instance
     
-    # Store original values
-    original_data_dir = DATA_DIR
-    original_address_file = ADDRESS_FILE
+    # Store original values from the imported weather module
+    original_data_dir = weather.DATA_DIR
+    original_address_file = weather.ADDRESS_FILE
 
     # Use tmp_path for DATA_DIR
     test_data_dir_name = "test_data_load" 
