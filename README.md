@@ -115,13 +115,16 @@ If the API key is not set, the application will notify you and proceed without i
 
 ```
 weather/
-├── weather.py             # Main application code
+├── src/
+│   └── weather.py         # Main application code
+├── data/
+│   ├── addresses.txt      # Stores previously searched addresses
+│   ├── airports.txt       # Stores airport codes for nearby stations
+│   └── airports_download.csv # Stores airport codes for random weather lookup
+├── tests/                 # Unit and integration tests
 ├── README.md              # This documentation
 ├── requirements.txt       # Python dependencies
-├── .gitignore             # Git ignore file
-└── addresses.txt          # Stores previously searched addresses
-└── airports.txt           # Stores airport codes for nearby stations
-└── airports_dowload.csv   # Stores airport codes for random weather lookup
+└── .gitignore             # Git ignore file
 ```
 
 ## Resources
