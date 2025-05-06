@@ -222,7 +222,7 @@ def test_load_addresses_file_not_found(monkeypatch, tmp_path):
 
 # --- Tests for API calling functions using mocks ---
 
-@patch('src.weather.requests.get', side_effect=mock_requests_get)
+@patch('weather.requests.get', side_effect=mock_requests_get) # Changed src.weather to weather
 def test_geocode_address_nominatim_success(mock_get):
     """Test geocode_address with Nominatim successfully."""
     address = "123 Main St"
@@ -237,7 +237,7 @@ def test_geocode_address_nominatim_success(mock_get):
     mock_get.assert_called_once()
     assert "nominatim.openstreetmap.org/search" in mock_get.call_args[0][0]
 
-@patch('src.weather.requests.get', side_effect=mock_requests_get)
+@patch('weather.requests.get', side_effect=mock_requests_get) # Changed src.weather to weather
 def test_geocode_address_census_success(mock_get):
     """Test geocode_address with US Census API successfully."""
     address = "1600 Pennsylvania Ave NW" # Address used in mock
@@ -253,7 +253,7 @@ def test_geocode_address_census_success(mock_get):
     mock_get.assert_called_once()
     assert "geocoding.geo.census.gov/geocoder/locations/onelineaddress" in mock_get.call_args[0][0]
 
-@patch('src.weather.requests.get', side_effect=mock_requests_get)
+@patch('weather.requests.get', side_effect=mock_requests_get) # Changed src.weather to weather
 def test_get_current_conditions_success(mock_get):
     """Test get_current_conditions successfully fetches and processes data."""
     lat, lon = 38.895037, -77.036543 # Example coordinates
@@ -273,7 +273,7 @@ def test_get_current_conditions_success(mock_get):
     expected_forecast_url = MOCK_NOAA_POINTS_SUCCESS['properties']['forecast']
     assert expected_forecast_url == mock_get.call_args_list[1][0][0]
 
-@patch('src.weather.requests.get', side_effect=mock_requests_get)
+@patch('weather.requests.get', side_effect=mock_requests_get) # Changed src.weather to weather
 def test_get_active_alerts_success(mock_get):
     """Test get_active_alerts successfully fetches alerts."""
     lat, lon = 38.895037, -77.036543
@@ -286,7 +286,7 @@ def test_get_active_alerts_success(mock_get):
     mock_get.assert_called_once()
     assert f"api.weather.gov/alerts/active?point={lat},{lon}" in mock_get.call_args[0][0]
 
-@patch('src.weather.requests.get', side_effect=mock_requests_get)
+@patch('weather.requests.get', side_effect=mock_requests_get) # Changed src.weather to weather
 def test_get_active_alerts_no_alerts(mock_get):
     """Test get_active_alerts when no alerts are present."""
     lat, lon = 39.0, -77.0 # Different coords to potentially trigger different mock if needed
@@ -312,8 +312,8 @@ def test_get_active_alerts_no_alerts(mock_get):
     mock_get.assert_called_once()
 
 
-@patch('src.weather.print_station_forecasts') # Mock printing - Changed: Removed MagicMock()
-@patch('src.weather.get_station_weather') # Mock the function that makes many API calls
+@patch('weather.print_station_forecasts') # Changed src.weather to weather
+@patch('weather.get_station_weather') # Changed src.weather to weather
 @patch('pandas.DataFrame.sample') # Mock random sampling
 @patch('urllib.request.urlopen') # Mock file download
 @patch('builtins.input', return_value='1') # Mock user input for scheduled service

@@ -1177,7 +1177,8 @@ def airport_download(args, print_results=True):
         finally:
             spinner.stop()
 
-            random_airports_tuples = list(zip(random_airports['station_id'], airports_df['name']))
+            # Use 'name' from random_airports DataFrame for robustness
+            random_airports_tuples = list(zip(random_airports['station_id'], random_airports['name']))
             station_weather = get_station_weather(random_airports_tuples)
             print_station_forecasts(station_weather, browser=args.browser, census=args.census)
 
