@@ -139,6 +139,12 @@ pytest
 
 This command will automatically discover and run all tests located in the `tests/` directory.
 
+> Note: If you are using a virtual environment, make sure it is activated before running the tests.
+
+## Troubleshooting
+
+- If you use the US Census Geocoder API and encounter issues, it may be due to overuse of the API and your IP address being blocked. In this case, you can use a VPN to change your IP address and try again.
+
 ## Resources
 
 - [NOAA Weather API Documentation](https://www.weather.gov/documentation/services-web-api)

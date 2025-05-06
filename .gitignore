@@ -6,4 +6,4 @@ data/airports_download.csv
 .vscode/
 venv*
 __pycache__/
-.pytest_cache/
+.pytest_cache*
