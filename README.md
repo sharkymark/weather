@@ -122,6 +122,9 @@ weather/
 │   ├── airports.txt       # Stores airport codes for nearby stations
 │   └── airports_download.csv # Stores airport codes for random weather lookup
 ├── tests/                 # Unit and integration tests
+│   ├── __init__.py        # Makes 'tests' a Python package
+│   ├── mocks.py           # Mock objects for testing API calls
+│   └── test_weather.py    # Unit tests for weather.py
 ├── README.md              # This documentation
 ├── requirements.txt       # Python dependencies
 └── .gitignore             # Git ignore file
