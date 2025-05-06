@@ -1,7 +1,7 @@
 .aider*
 .env
-addresses.txt
-airports.txt
-airports_download.csv
+data/addresses.txt
+data/airports.txt
+data/airports_download.csv
 .vscode/
 venv*
