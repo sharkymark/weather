@@ -18,7 +18,12 @@
                 "ms-python.python",
                 "ms-python.vscode-pylance",
                 "github.copilot"
-            ]
+            ],
+            "settings": {
+                "python.testing.pytestArgs": ["tests/"],
+                "python.testing.pytestEnabled": true,
+                "python.analysis.extraPaths": ["./src"]
+            }
         }
     },
     "postCreateCommand": "echo \"${GITHUB_PERSONAL_ACCESS_TOKEN}\" | gh auth login --with-token && echo 'Authentication successful' && git config --global --add safe.directory \"$(git rev-parse --show-toplevel)\" ",

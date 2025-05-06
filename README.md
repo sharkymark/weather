@@ -115,14 +115,47 @@ If the API key is not set, the application will notify you and proceed without i
 
 ```
 weather/
-├── weather.py             # Main application code
+├── src/
+│   └── weather.py         # Main application code
+├── data/
+│   ├── addresses.txt      # Stores previously searched addresses
+│   ├── airports.txt       # Stores airport codes for nearby stations
+│   └── airports_download.csv # Stores airport codes for random weather lookup
+├── tests/                 # Unit and integration tests
 ├── README.md              # This documentation
 ├── requirements.txt       # Python dependencies
-├── .gitignore             # Git ignore file
-└── addresses.txt          # Stores previously searched addresses
-└── airports.txt           # Stores airport codes for nearby stations
-└── airports_dowload.csv   # Stores airport codes for random weather lookup
+└── .gitignore             # Git ignore file
 ```
+
+## Unit Testing
+
+This project uses `pytest` for running tests and `unittest.mock` for creating mock objects to simulate API calls and other external dependencies. This allows for isolated testing of individual functions and components.
+
+To run the tests, navigate to the project's root directory in your terminal (where `requirements.txt` is located) and execute:
+
+```bash
+pytest
+```
+
+This command will automatically discover and run all tests located in the `tests/` directory.
+
+> Note: If you are using a virtual environment, make sure it is activated before running the tests.
+
+## Troubleshooting
+
+- If you use the US Census Geocoder API and encounter issues, it may be due to overuse of the API and your IP address being blocked. In this case, you can use a VPN to change your IP address and try again.
+
+## Resources
+
+- [NOAA Weather API Documentation](https://www.weather.gov/documentation/services-web-api)
+
+- [Nominatim Geocoder API Documentation](https://nominatim.org/release-docs/develop/api/Search/)
+
+- [US Census Geocoder API Documentation](https://www.census.gov/data/developers/data-sets/Geocoding-services.html)
+
+- [pytest Documentation](https://docs.pytest.org/en/stable/)
+
+- [Airport Codes CSV](https://davidmegginson.github.io/ourairports-data/)
 
 ## Contributing
 
