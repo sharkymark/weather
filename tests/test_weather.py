@@ -213,12 +213,7 @@ def test_load_addresses_file_not_found(monkeypatch, tmp_path):
     # This is complex due to Python's module caching.
     # A better long-term solution is to refactor weather.py to not rely on module-level globals for paths.
     # For now, we rely on monkeypatch's scope.
-    # To be absolutely safe, one might reload the module or pass paths explicitly.
-
-    # Reset to original values after test to avoid interference
-    # This is crucial if not using monkeypatch for all global changes.
-    weather.DATA_DIR = original_data_dir
-    weather.ADDRESS_FILE = original_address_file
+    # monkeypatch.setattr correctly restored the original values of weather.DATA_DIR and weather.ADDRESS_FILE.
 
 # Note: Testing functions that make API calls (like geocode_address, _fetch_noaa_data, etc.)
 # would require mocking the `requests.get` calls using `pytest-mock` or `unittest.mock`.
@@ -308,7 +303,8 @@ def test_get_active_alerts_no_alerts(mock_get):
     # For now, let's assume MOCK_NOAA_ALERTS_EMPTY is returned by a specific condition in mock_requests_get
     # (e.g. based on lat/lon if we made mock_requests_get that sophisticated)
     # Or, more simply, patch it to return the empty list directly for this test:
-    mock_get.return_value.json.return_value = MOCK_NOAA_ALERTS_EMPTY
+    # The mock_requests_get function is now configured to return MOCK_NOAA_ALERTS_EMPTY
+    # for the specific coordinates used in this test (39.0, -77.0).
     
     alerts = get_active_alerts(lat, lon)
     
@@ -316,7 +312,7 @@ def test_get_active_alerts_no_alerts(mock_get):
     mock_get.assert_called_once()
 
 
-@patch('src.weather.print_station_forecasts', MagicMock()) # Mock printing
+@patch('src.weather.print_station_forecasts') # Mock printing - Changed: Removed MagicMock()
 @patch('src.weather.get_station_weather') # Mock the function that makes many API calls
 @patch('pandas.DataFrame.sample') # Mock random sampling
 @patch('urllib.request.urlopen') # Mock file download

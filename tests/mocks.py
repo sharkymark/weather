@@ -187,6 +187,7 @@ def mock_requests_get(*args, **kwargs):
     A mock for requests.get that returns different responses based on the URL.
     """
     url = args[0]
+    params_dict = kwargs.get("params", {}) # Get params dict for easier access
     mock_response = MagicMock()
     mock_response.status_code = 200
     mock_response.raise_for_status = MagicMock() # No error by default
@@ -202,7 +203,9 @@ def mock_requests_get(*args, **kwargs):
     elif "nominatim.openstreetmap.org/reverse" in url:
         mock_response.json.return_value = MOCK_NOMINATIM_REVERSE_GEOCODE_SUCCESS
     elif "geocoding.geo.census.gov/geocoder/locations/onelineaddress" in url:
-        if "address=1600+Pennsylvania+Ave+NW" in kwargs.get("params", {}).get("address", ""):
+        # Check for specific address and benchmark used in the successful mock
+        if params_dict.get("address") == "1600 Pennsylvania Ave NW" and \
+           params_dict.get("benchmark") == "Public_AR_Current":
             mock_response.json.return_value = MOCK_CENSUS_GEOCODE_SUCCESS
         else:
             mock_response.json.return_value = MOCK_CENSUS_GEOCODE_NO_MATCH
@@ -219,11 +222,13 @@ def mock_requests_get(*args, **kwargs):
     elif "api.weather.gov/stations" in url and "/observations/latest" in url: # Generic station observation
         mock_response.json.return_value = MOCK_NOAA_OBSERVATION_SUCCESS_KDCA # Default to KDCA for simplicity
     elif "api.weather.gov/alerts/active" in url:
-        # Allow specific testing for empty alerts based on a parameter or specific URL detail if needed
-        # For example, if params contained a specific flag for testing empty alerts:
-        if kwargs.get("params", {}).get("test_empty_alerts"):
+        # Specific case for test_get_active_alerts_no_alerts (uses lat, lon = 39.0, -77.0)
+        if "point=39.0,-77.0" in url:
             mock_response.json.return_value = MOCK_NOAA_ALERTS_EMPTY
-        else:
+        # Add other specific conditions for alerts if needed for other tests
+        # elif "point=some_other_lat,some_other_lon" in url:
+        #     mock_response.json.return_value = SOME_OTHER_MOCK_ALERTS
+        else: # Default for other alert calls, e.g., test_get_active_alerts_success
             mock_response.json.return_value = MOCK_NOAA_ALERTS_SUCCESS
     else:
         # Default or error case
