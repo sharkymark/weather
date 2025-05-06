@@ -17,7 +17,10 @@ from urllib.parse import quote_plus
 import argparse
 import platform
 
-ADDRESS_FILE = "data/addresses.txt"
+DATA_DIR = "data"
+ADDRESS_FILE = "addresses.txt"
+AIRPORTS_FILE = "airports.txt"
+AIRPORTS_DOWNLOAD_CSV = "airports_download.csv"
 NOMINATIM_API_BASE_URL = "https://nominatim.openstreetmap.org/search"
 CENSUS_API_BASE_URL = "https://geocoding.geo.census.gov/geocoder/locations/onelineaddress"
 CENSUS_API_KEY = os.getenv("CENSUS_API_KEY")
@@ -37,14 +40,16 @@ def notify_chrome_missing():
 
 def load_addresses():
     """Loads previously entered addresses from a file."""
-    if os.path.exists(ADDRESS_FILE):
-        with open(ADDRESS_FILE, "r") as f:
+    full_address_path = os.path.join(DATA_DIR, ADDRESS_FILE)
+    if os.path.exists(full_address_path):
+        with open(full_address_path, "r") as f:
             return [line.strip() for line in f]
     return []
 
 def save_addresses(addresses):
     """Saves entered addresses to a file."""
-    with open(ADDRESS_FILE, "w") as f:
+    full_address_path = os.path.join(DATA_DIR, ADDRESS_FILE)
+    with open(full_address_path, "w") as f:
         for address in addresses:
             f.write(address + "\n")
 
@@ -704,7 +709,8 @@ def airports_menu(args):
     spinner = Halo(text='Reading airport data from file...', spinner='dots')
     spinner.start()
     try:
-        with open('data/airports.txt', 'r') as file:
+        full_airports_path = os.path.join(DATA_DIR, AIRPORTS_FILE)
+        with open(full_airports_path, 'r') as file:
             station_ids = []
             for line in file:
                 line = line.strip()
@@ -998,13 +1004,14 @@ def address_menu(args):
 
 def airport_search(args):
     """Search airports by wildcard"""
+    full_airports_download_path = os.path.join(DATA_DIR, AIRPORTS_DOWNLOAD_CSV)
     # Check if airports_download.csv exists
-    if not os.path.exists('data/airports_download.csv'):
+    if not os.path.exists(full_airports_download_path):
         print("Airport database not found. Downloading...")
         airport_download(args, print_results=False)  # Include args here
 
     # Load airport data
-    airports_df = pd.read_csv('data/airports_download.csv')
+    airports_df = pd.read_csv(full_airports_download_path)
 
     # Get search term
     try:
@@ -1125,7 +1132,8 @@ def airport_download(args, print_results=True):
         # Download the CSV file
         with urllib.request.urlopen(airports_url, context=ssl_context) as response:
             csv_content = response.read()
-            with open('data/airports_download.csv', 'wb') as file:
+            full_airports_download_path = os.path.join(DATA_DIR, AIRPORTS_DOWNLOAD_CSV)
+            with open(full_airports_download_path, 'wb') as file:
                 file.write(csv_content)
             airports_df = pd.read_csv(io.StringIO(csv_content.decode('utf-8')))
 
@@ -1144,7 +1152,8 @@ def airport_download(args, print_results=True):
 
             # Ensure filtered_airports_df is a DataFrame before calling to_csv
             if isinstance(filtered_airports_df, pd.DataFrame):
-                filtered_airports_df.to_csv('data/airports_download.csv', index=False)
+                full_airports_download_path = os.path.join(DATA_DIR, AIRPORTS_DOWNLOAD_CSV)
+                filtered_airports_df.to_csv(full_airports_download_path, index=False)
             else:
                 print("Error: filtered_airports_df is not a DataFrame")
         spinner.succeed("Airport data downloaded successfully.")
