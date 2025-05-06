@@ -1,17 +1,17 @@
 import pytest
 import os
-import sys
 from datetime import datetime, timezone, timedelta
 from unittest.mock import patch, MagicMock, call # Added patch, MagicMock, call
+# Removed: import sys
 import argparse # Added for creating mock args
 import pandas as pd # Added for airport_download test
 
-# Add the src directory to the Python path
-# This allows us to import modules from the src directory
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
+# Removed: sys.path.insert(...)
+# Pytest, when run from the project root, typically adds the root to sys.path,
+# allowing imports like 'from src.module import ...' if 'src' is a package.
 
 # Import functions from weather.py
-from weather import (
+from src.weather import ( # Changed: Added 'src.' prefix
     format_time,
     convert_kmh_to_mph,
     convert_temperature,
@@ -30,6 +30,7 @@ from weather import (
 )
 
 # Import mocks
+# tests.mocks is already a package due to tests/__init__.py
 from tests.mocks import (
     mock_requests_get,
     MOCK_NOMINATIM_GEOCODE_SUCCESS,
@@ -136,7 +137,7 @@ def test_load_and_save_addresses(tmp_path, monkeypatch): # Add monkeypatch here
     
     # Import weather module locally to access its globals if needed for setup,
     # but the functions load_addresses and save_addresses will use the module's own globals.
-    import weather
+    from src import weather # Changed: import weather module from src package
 
     # Define the expected path for the data subdirectory within tmp_path
     # weather.DATA_DIR is "data", weather.ADDRESS_FILE is "addresses.txt"
@@ -172,7 +173,7 @@ def test_load_and_save_addresses(tmp_path, monkeypatch): # Add monkeypatch here
 def test_load_addresses_file_not_found(monkeypatch, tmp_path):
     # Ensure DATA_DIR points to a temporary directory for this test
     # and ADDRESS_FILE is a file that won't exist initially.
-    import weather # Import here to ensure monkeypatch targets the correct module instance
+    from src import weather # Changed: import weather module from src package
     
     # Store original values from the imported weather module
     original_data_dir = weather.DATA_DIR
@@ -187,7 +188,7 @@ def test_load_addresses_file_not_found(monkeypatch, tmp_path):
     # For load_addresses, it constructs `full_address_path = os.path.join(DATA_DIR, ADDRESS_FILE)`
     # So, if DATA_DIR is `tmp_path / "data"`, then `full_address_path` will be `tmp_path / "data" / "addresses.txt"`
 
-    import weather
+    # from src import weather # Already imported at the start of the function
     # We want load_addresses to look inside tmp_path for a "data" subdir
     # So, we set weather.DATA_DIR to be just "data"
     # and then ensure that the current working directory for the test
@@ -222,7 +223,7 @@ def test_load_addresses_file_not_found(monkeypatch, tmp_path):
 
 # --- Tests for API calling functions using mocks ---
 
-@patch('weather.requests.get', side_effect=mock_requests_get) # Changed src.weather to weather
+@patch('src.weather.requests.get', side_effect=mock_requests_get) # Changed: weather. to src.weather.
 def test_geocode_address_nominatim_success(mock_get):
     """Test geocode_address with Nominatim successfully."""
     address = "123 Main St"
@@ -237,7 +238,7 @@ def test_geocode_address_nominatim_success(mock_get):
     mock_get.assert_called_once()
     assert "nominatim.openstreetmap.org/search" in mock_get.call_args[0][0]
 
-@patch('weather.requests.get', side_effect=mock_requests_get) # Changed src.weather to weather
+@patch('src.weather.requests.get', side_effect=mock_requests_get) # Changed: weather. to src.weather.
 def test_geocode_address_census_success(mock_get):
     """Test geocode_address with US Census API successfully."""
     address = "1600 Pennsylvania Ave NW" # Address used in mock
@@ -253,7 +254,7 @@ def test_geocode_address_census_success(mock_get):
     mock_get.assert_called_once()
     assert "geocoding.geo.census.gov/geocoder/locations/onelineaddress" in mock_get.call_args[0][0]
 
-@patch('weather.requests.get', side_effect=mock_requests_get) # Changed src.weather to weather
+@patch('src.weather.requests.get', side_effect=mock_requests_get) # Changed: weather. to src.weather.
 def test_get_current_conditions_success(mock_get):
     """Test get_current_conditions successfully fetches and processes data."""
     lat, lon = 38.895037, -77.036543 # Example coordinates
@@ -273,7 +274,7 @@ def test_get_current_conditions_success(mock_get):
     expected_forecast_url = MOCK_NOAA_POINTS_SUCCESS['properties']['forecast']
     assert expected_forecast_url == mock_get.call_args_list[1][0][0]
 
-@patch('weather.requests.get', side_effect=mock_requests_get) # Changed src.weather to weather
+@patch('src.weather.requests.get', side_effect=mock_requests_get) # Changed: weather. to src.weather.
 def test_get_active_alerts_success(mock_get):
     """Test get_active_alerts successfully fetches alerts."""
     lat, lon = 38.895037, -77.036543
@@ -286,7 +287,7 @@ def test_get_active_alerts_success(mock_get):
     mock_get.assert_called_once()
     assert f"api.weather.gov/alerts/active?point={lat},{lon}" in mock_get.call_args[0][0]
 
-@patch('weather.requests.get', side_effect=mock_requests_get) # Changed src.weather to weather
+@patch('src.weather.requests.get', side_effect=mock_requests_get) # Changed: weather. to src.weather.
 def test_get_active_alerts_no_alerts(mock_get):
     """Test get_active_alerts when no alerts are present."""
     lat, lon = 39.0, -77.0 # Different coords to potentially trigger different mock if needed
@@ -312,8 +313,8 @@ def test_get_active_alerts_no_alerts(mock_get):
     mock_get.assert_called_once()
 
 
-@patch('weather.print_station_forecasts') # Changed src.weather to weather
-@patch('weather.get_station_weather') # Changed src.weather to weather
+@patch('src.weather.print_station_forecasts') # Changed: weather. to src.weather.
+@patch('src.weather.get_station_weather') # Changed: weather. to src.weather.
 @patch('pandas.DataFrame.sample') # Mock random sampling
 @patch('urllib.request.urlopen') # Mock file download
 @patch('builtins.input', return_value='1') # Mock user input for scheduled service
