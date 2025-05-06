@@ -3,6 +3,7 @@
 data/addresses.txt
 data/airports.txt
 data/airports_download.csv
+!data/.gitkeep
 .vscode/
 venv*
 __pycache__/
