@@ -6,3 +6,4 @@ pytz
 pandas
 lxml
 certifi
+pytest
