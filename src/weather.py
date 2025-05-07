@@ -51,7 +51,7 @@ def save_addresses(addresses):
     full_address_path = os.path.join(DATA_DIR, ADDRESS_FILE)
     with open(full_address_path, "w") as f:
         for address in addresses:
-            f.write(address + "\n")
+            f.write(address.upper() + "\n")
 
 def geocode_address(address, use_census_api=False):
     """
@@ -793,7 +793,6 @@ def address_menu(args):
 
         if latitude is None or longitude is None:
             print("\nAddress not found. Please try again.\n")
-            main()  # Reshow the main menu
             return
 
         if matched_address and matched_address not in stored_addresses:
@@ -954,8 +953,9 @@ def address_menu(args):
                     else:
                         address = input("Enter a street address: ")
 
-                    latitude, longitude, matched_address = geocode_address(address)
+                    latitude, longitude, matched_address = geocode_address(address, use_census_api=args.census)
                     if latitude is None or longitude is None:
+                        print("\nAddress not found for the new location. Please try again.\n")
                         continue
 
                     if matched_address and matched_address not in stored_addresses:
