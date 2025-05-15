@@ -154,7 +154,7 @@ def get_county_state_from_latlon(latitude, longitude):
     try:
         spinner.start()
         url = f"https://geo.fcc.gov/api/census/block/find?latitude={latitude}&longitude={longitude}&format=json"
-        response = requests.get(url)
+        response = requests.get(url,timeout=1)
         response.raise_for_status()
         data = response.json()
         spinner.succeed("County and state received successfully")
@@ -186,7 +186,7 @@ def get_city_state_from_latlon(latitude, longitude, use_census_api=False):
         
         if use_census_api:
             url = f"{CENSUS_REVERSE_URL}?x={longitude}&y={latitude}&benchmark=Public_AR_Current&vintage=Current_Current&format=json"
-            response = requests.get(url)
+            response = requests.get(url, timeout=1, headers=headers)
             response.raise_for_status()
             data = response.json()
 
