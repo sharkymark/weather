@@ -94,9 +94,20 @@ Follow the on-screen prompts to:
 This application uses:
 
 - Nominatim Geocoder and Reverse Geocoder API
+- US Census Geocoder API (default)
 - NOAA Weather API (no key required)
 
-If you want to use the US Census Geocoder API, use the argument `--census` when running the application. This will use the US Census Geocoder API for geocoding instead of Nominatim.
+By default, the app uses the US Census Geocoder API for geocoding. To use the Nominatim Geocoder API instead, use the argument `--geocoder nominatim` when running the application:
+
+```bash
+python weather.py --geocoder nominatim
+```
+
+To explicitly use the Census Geocoder API (default):
+
+```bash
+python weather.py --geocoder census
+```
 
 ## Environment Variables
 

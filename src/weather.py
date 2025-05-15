@@ -53,22 +53,28 @@ def save_addresses(addresses):
         for address in addresses:
             f.write(address.upper() + "\n")
 
-def geocode_address(address, use_census_api=False):
+def geocode_address(address, geocoder="census"):
     """
     Geocodes an address using either Nominatim or US Census Geocoder API.
 
     Args:
       address: The street address to geocode.
+      geocoder: 'census' or 'nominatim'
 
     Returns:
-      A tuple containing (latitude, longitude) or None if geocoding fails.
+      A tuple containing (latitude, longitude, matched_address) or (None, None, None) if geocoding fails.
     """
-    if use_census_api:
+    headers = {
+        'User-Agent': 'Weather-App/1.0'
+    }
+    timeout = 1
+    if geocoder == "census":
+        benchmark = "Public_AR_Current"
         api_base_url = CENSUS_API_BASE_URL
         params = {
             "address": address,
-            "benchmark": "Public_AR_Current",
-            "format": "json",
+            "benchmark": benchmark,
+            "format": "json"
         }
         if CENSUS_API_KEY:
             params["key"] = CENSUS_API_KEY
@@ -83,40 +89,36 @@ def geocode_address(address, use_census_api=False):
         api_name = "Nominatim"
 
     spinner = Halo(text=f'Geocoding address using {api_name}...', spinner='dots')
+    spinner.start()
     try:
-        spinner.start()
-        headers = {
-            'User-Agent': 'Weather-App/1.0'
-        }
-        response = requests.get(api_base_url, params=params, headers=headers)
+        response = requests.get(api_base_url, params=params, headers=headers, timeout=timeout)
         response.raise_for_status()
         data = response.json()
-
+        if geocoder == "census":
+            if data.get('result', {}).get('addressMatches'):
+                match = data['result']['addressMatches'][0]
+                latitude = match['coordinates']['y']
+                longitude = match['coordinates']['x']
+                matched_address = match['matchedAddress']
+                spinner.succeed("Address geocoded successfully.")
+                return float(latitude), float(longitude), matched_address
+            else:
+                spinner.fail("Address could not be matched.")
+                return None, None, None
+        else:
+            if data:
+                latitude = data[0]['lat']
+                longitude = data[0]['lon']
+                spinner.succeed("Address geocoded successfully.")
+                return float(latitude), float(longitude), address
+            else:
+                spinner.fail("Address could not be matched.")
+                return None, None, None
     except requests.exceptions.RequestException as e:
         spinner.fail(f"Error during {api_name} API request: {e}")
         return None, None, None
     finally:
         spinner.stop()
-
-    if use_census_api:
-        if data['result']['addressMatches']:
-            match = data['result']['addressMatches'][0]
-            latitude = match['coordinates']['y']
-            longitude = match['coordinates']['x']
-            spinner.succeed("Address geocoded successfully.")
-            return float(latitude), float(longitude), match['matchedAddress']
-        else:
-            spinner.fail("Address could not be matched.")
-            return None, None, None
-    else:
-        if data:
-            latitude = data[0]['lat']
-            longitude = data[0]['lon']
-            spinner.succeed("Address geocoded successfully.")
-            return float(latitude), float(longitude), address
-        else:
-            spinner.fail("Address could not be matched.")
-            return None, None, None
 
 def generate_google_maps_url(latitude, longitude, label):
     """
@@ -660,7 +662,6 @@ def print_station_forecasts(station_weather, browser=False, census=False):
         print("\n\nAirport Weather Conditions:\n")
 
         for station in station_weather:
-            print("-" * 20)
             print(f"Station ID: {station['station_id']}")
             print(f"Labeled as: {station['labelled_name']}")
             print(f"Station Name: {station['station_name']}")
@@ -789,7 +790,7 @@ def address_menu(args):
         else:
             address = input("\nEnter a street address: ")
 
-        latitude, longitude, matched_address = geocode_address(address, use_census_api=args.census)
+        latitude, longitude, matched_address = geocode_address(address, geocoder=args.geocoder)
 
         if latitude is None or longitude is None:
             print("\nAddress not found. Please try again.\n")
@@ -953,7 +954,7 @@ def address_menu(args):
                     else:
                         address = input("Enter a street address: ")
 
-                    latitude, longitude, matched_address = geocode_address(address, use_census_api=args.census)
+                    latitude, longitude, matched_address = geocode_address(address, geocoder=args.geocoder)
                     if latitude is None or longitude is None:
                         print("\nAddress not found for the new location. Please try again.\n")
                         continue
@@ -1189,18 +1190,20 @@ def main():
     parser = argparse.ArgumentParser(description="Weather App using US Census & NOAA APIs")
     parser.add_argument('--browser', action='store_true',
                        help='Open weather station URLs in Chrome browser (macOS only)')
-    parser.add_argument('--census', action='store_true',
-                        help='Use US Census API for geocoding')
+    parser.add_argument('--geocoder', choices=['census', 'nominatim'], default='census',
+                        help='Choose geocoding service: "census" (default) for US Census API, or "nominatim" for OpenStreetMap Nominatim API')
     args = parser.parse_args()
 
 
     print("Welcome to the Weather App!")
     print("\nThis app uses the following APIs:")
 
-    if args.census:
-        geocode="US Census"
+    if args.geocoder == 'census':
+        geocode = "US Census"
+        use_census = True
     else:
-        geocode="Nominatim"
+        geocode = "Nominatim"
+        use_census = False
 
     print(f"- {geocode} API for geocoding an address")
     print("- NOAA API for weather data")
@@ -1209,6 +1212,9 @@ def main():
     if args.browser and platform.system() != 'Darwin':
         print("\nNote: The --browser option is only supported on macOS. This option will be ignored.")
         args.browser = False
+
+    # Patch args to have .census for downstream compatibility
+    args.census = use_census
 
     notify_api_key_status(args)
 
