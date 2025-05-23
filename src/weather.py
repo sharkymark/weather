@@ -659,7 +659,10 @@ def print_zillow(lat, lon, browser, census):
 
 def print_station_forecasts(station_weather, browser=False, census=False):
     if station_weather:
-        print("\n\nAirport Weather Conditions:\n")
+        for station in station_weather:
+            print(f"\nLatitude: {station['latitude']}, Longitude: {station['longitude']}")
+            
+        print("\nAirport Weather Conditions:\n")
 
         for station in station_weather:
             print(f"Station ID: {station['station_id']}")
