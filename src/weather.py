@@ -1821,6 +1821,29 @@ def backup_and_wipe_data_files():
         print(f"Error during backup and wipe: {e}")
         return False
 
+def copy_example_addresses():
+    """
+    Copies example addresses from example-addresses.txt to addresses.txt.
+    Returns True if successful, False if example file doesn't exist or on error.
+    """
+    try:
+        example_file = os.path.join(DATA_DIR, "example-addresses.txt")
+        target_file = os.path.join(DATA_DIR, ADDRESS_FILE)
+        
+        if not os.path.exists(example_file):
+            print(f"Example addresses file not found at {example_file}")
+            return False
+            
+        with open(example_file, 'r') as src_file, open(target_file, 'w') as dst_file:
+            dst_file.write(src_file.read())
+        
+        print(f"Copied example addresses from {example_file} to {target_file}")
+        return True
+        
+    except Exception as e:
+        print(f"Error copying example addresses: {e}")
+        return False
+
 def main():
     parser = argparse.ArgumentParser(description="Weather App using US Census & NOAA APIs")
     parser.add_argument('--browser', action='store_true',
@@ -1829,6 +1852,8 @@ def main():
                         help='Choose geocoding service: "census" (default) for US Census API, or "nominatim" for OpenStreetMap Nominatim API')
     parser.add_argument('--wipe', action='store_true',
                        help='Backup data files to /tmp/weather/ with original filenames and wipe them from the data directory')
+    parser.add_argument('--reset', action='store_true',
+                       help='Backup existing data files and restore example addresses from example-addresses.txt')
     # REMOVED API KEY ARGUMENTS AS PER USER REQUEST
     args = parser.parse_args()
     
@@ -1842,6 +1867,46 @@ def main():
             if answer != 'y':
                 print("Exiting the application.")
                 exit(0)
+                
+    # Handle reset argument if provided
+    if args.reset:
+        # First backup existing files
+        backup_dir = '/tmp/weather'
+        if not os.path.exists(backup_dir):
+            os.makedirs(backup_dir)
+            
+        addresses_file = os.path.join(DATA_DIR, ADDRESS_FILE)
+        airports_file = os.path.join(DATA_DIR, AIRPORTS_FILE)
+        
+        # Backup existing files if they exist
+        for src, name in [(addresses_file, ADDRESS_FILE), (airports_file, AIRPORTS_FILE)]:
+            if os.path.exists(src):
+                dst = f"{backup_dir}/{name}"
+                try:
+                    with open(src, 'rb') as src_file, open(dst, 'wb') as dst_file:
+                        dst_file.write(src_file.read())
+                    print(f"Backed up {src} to {dst}")
+                except Exception as e:
+                    print(f"Error backing up {src}: {e}")
+        
+        # Now copy example addresses
+        if copy_example_addresses():
+            print("Reset completed: example addresses restored.")
+        else:
+            print("Reset incomplete: failed to copy example addresses.")
+            answer = input("Do you want to continue with the application? (y/n): ").strip().lower()
+            if answer != 'y':
+                print("Exiting the application.")
+                exit(0)
+    
+    # Check if addresses.txt exists - if not, try to copy from example-addresses.txt
+    addresses_file = os.path.join(DATA_DIR, ADDRESS_FILE)
+    if not os.path.exists(addresses_file):
+        print(f"No {ADDRESS_FILE} found. Attempting to copy from example-addresses.txt...")
+        if copy_example_addresses():
+            print("Successfully initialized with example addresses.")
+        else:
+            print("Could not initialize with example addresses. Starting with empty address list.")
 
 
     print("Welcome to the Weather App!")

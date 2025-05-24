@@ -84,10 +84,16 @@ To backup data files to /tmp/weather/ and wipe them from the data directory (use
 python weather.py --wipe
 ```
 
+To restore example addresses from example-addresses.txt (after backing up existing data files):
+
+```bash
+python weather.py --reset
+```
+
 You can combine arguments:
 
 ```bash
-python weather.py --browser --geocoder nominatim --wipe
+python weather.py --browser --geocoder nominatim --reset
 ```
 
 Follow the on-screen prompts to:
