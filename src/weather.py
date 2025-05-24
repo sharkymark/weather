@@ -1480,11 +1480,11 @@ def noaa_get_station_info(station_id, args):
     finally:
         spinner.stop()
 
-def noaa_display_station_info(station_info_data, args):
-    """Display NOAA tide station information"""
+def noaa_display_station_info(station_info_data): # Removed args from signature
+    """Display NOAA tide station information and return its map URL."""
     if not station_info_data or not station_info_data.get('stations'):
         print("\nNo station information to display.")
-        return
+        return None
 
     station = station_info_data['stations'][0] # API returns a list with one station
     print("\nNOAA Tide Station Information:")
@@ -1492,43 +1492,18 @@ def noaa_display_station_info(station_info_data, args):
     station_name = station.get('name', 'N/A')
     station_state = station.get('state', 'N/A')
     print(f"  Name: {station_name}, {station_state}")
-    # NOAA station metadata uses 'lat' and 'lng'
     lat = station.get('lat')
     lon = station.get('lng') 
     print(f"  Coordinates: Lat: {lat}, Lon: {lon}")
 
+    maps_url = None
     if lat and lon:
-        # Include state in the label for better context in Google Maps
-        # maps_label = f"{station_name}, {station_state}"
-        # commenting out label to get marker of coordinates only
-        maps_url = generate_google_maps_url(lat, lon, "", zoom=15)
-        print(f"  Google Maps: {maps_url}")
-
-        if args.browser:
-            if platform.system() == 'Darwin':
-                chrome_path = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-                try:
-                    if not os.path.exists(chrome_path):
-                        raise FileNotFoundError(f"Google Chrome not found at {chrome_path}")
-                    
-                    # Use subprocess to open Chrome directly and silently
-                    subprocess.run([chrome_path, maps_url], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-                except (FileNotFoundError, subprocess.CalledProcessError, Exception) as e:
-                    # Broader exception catch for issues with subprocess or file not found
-                    print(f"Could not open in Chrome ({e}). Trying default system browser.")
-                    try:
-                        webbrowser.open_new_tab(maps_url) # Fallback to default browser
-                    except webbrowser.Error as wb_err:
-                        print(f"Fallback browser opening also failed: {wb_err}. Please open URL manually: {maps_url}")
-            else:
-                # For non-macOS systems
-                try:
-                    webbrowser.open_new_tab(maps_url)
-                except webbrowser.Error as wb_err:
-                    print(f"Could not open URL in browser: {wb_err}. Please open manually: {maps_url}")
+        maps_url = generate_google_maps_url(lat, lon, "", zoom=15) # Label is empty for coordinate-based marker
+        print(f"  Google Maps for station: {maps_url}")
     else:
-        print("  (Could not generate Google Maps link due to missing coordinates)")
+        print("  (Could not generate Google Maps link for station due to missing coordinates)")
+    
+    return maps_url # Return the URL (or None), browser opening is handled by caller
 
 def noaa_get_tide_data(station_id, args):
     """Fetch tide data from NOAA API for a given station ID"""
@@ -1601,42 +1576,37 @@ def _handle_tide_logic_for_address(latitude, longitude, matched_address, args):
 
     station_id = noaa_get_nearest_tide_station(latitude, longitude, matched_address, args)
     if not station_id:
-        # Message already printed by noaa_get_nearest_tide_station
         return
 
     station_info = noaa_get_station_info(station_id, args)
+    
+    station_map_url_to_open = None
+    station_name_for_desc = station_id # Default to ID for description
+
     if station_info:
-        noaa_display_station_info(station_info, args) # This already handles browser opening for station
+        # Display station info and get its map URL (without opening it yet)
+        station_map_url_to_open = noaa_display_station_info(station_info) # No args passed here
+        if station_info.get('stations'):
+            station_name_for_desc = station_info['stations'][0].get('name', station_id)
     else:
         print(f"\nCould not retrieve detailed information for station {station_id}.")
-        # Continue to try fetching tide data as station_id might still be valid if info call failed
 
-    print() # Add a newline for separation
+    print() 
     tide_data = noaa_get_tide_data(station_id, args)
     if tide_data:
         noaa_display_tide_data(tide_data)
     else:
-        # Message already printed by noaa_get_tide_data or handled if predictions are empty
         print(f"\nCould not retrieve tide predictions for station {station_id}.")
 
-    # Open Google Maps for the matched address if browser option is enabled
-    if args.browser and latitude is not None and longitude is not None:
-        print(f"\nOpening Google Maps for the address: {matched_address}...")
-        address_map_url = generate_google_maps_url(latitude, longitude, matched_address)
-        print(f"Google Maps URL for address: {address_map_url}")
-        try:
-            if platform.system() == 'Darwin': # macOS
-                chrome_path = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-                if os.path.exists(chrome_path):
-                    # Try to open with Chrome directly to suppress terminal messages
-                    subprocess.run([chrome_path, address_map_url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                else: # Fallback if Chrome is not at the typical path
-                    webbrowser.open(address_map_url) 
-                    notify_chrome_missing(custom_message="Attempted to open with default browser as Chrome was not found at the standard path.")
-            else: # For other OS, use webbrowser.open (may not be Chrome)
-                webbrowser.open(address_map_url)
-        except Exception as e:
-            print(f"Could not open browser for address map: {e}")
+    if args.browser:
+        # 1. Open Google Maps for the matched address first
+        if latitude is not None and longitude is not None:
+            address_map_url = generate_google_maps_url(latitude, longitude, matched_address)
+            _open_url_in_browser(address_map_url, args, description=f"Google Maps for address '{matched_address}'")
+        
+        # 2. Then, open Google Maps for the tide station (if URL is available)
+        if station_map_url_to_open:
+            _open_url_in_browser(station_map_url_to_open, args, description=f"Google Maps for tide station '{station_name_for_desc}'")
 
 def tides_lookup_new_address(args):
     """Handles tide lookup for a new address."""
@@ -1756,6 +1726,27 @@ def tides_menu(args):
             print(f"An error occurred in the Tides Menu: {e}")
             print("Returning to Main Menu.")
             return
+
+# Utility function to open URL in browser
+def _open_url_in_browser(url, args, description="URL"):
+    if not args.browser:
+        return
+
+    # Ensure the description is user-friendly
+    print(f"\nAttempting to open {description} in browser...")
+    print(f"URL: {url}")
+    try:
+        if platform.system() == 'Darwin': # macOS
+            chrome_path = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+            if os.path.exists(chrome_path):
+                subprocess.run([chrome_path, url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+            else: 
+                webbrowser.open(url) 
+                notify_chrome_missing(custom_message="Attempted to open with default browser as Chrome was not found at the standard path.")
+        else: # For other OS, use webbrowser.open
+            webbrowser.open(url)
+    except Exception as e:
+        print(f"Could not open browser for {description}: {e}")
 
 def main():
 
