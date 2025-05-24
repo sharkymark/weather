@@ -27,6 +27,12 @@ A Python command-line application that provides comprehensive weather informatio
   - **Filter airports**: by code, name, state and municipality\*\*
   - **Zillow URL Integration**: Provides Zillow link to county and state of airport
   - **Download airport codes**: if not resident locally from a [GitHub repository](https://davidmegginson.github.io/ourairports-data/airports.csv)\*\*
+- **Earthquake Information**: Fetch and display recent earthquake data from USGS.
+  - **Filter by magnitude**: Search for earthquakes by minimum magnitude or a magnitude range.
+  - **Filter by time period**: Options include "Today", "Last 24 hours", "Last 48 hours", and "Last week".
+  - **Google Maps Integration**: Provides Google Maps links for earthquake epicenters.
+  - **USGS Link**: Provides a direct link to the USGS event page for more details.
+- **Tide Information**: Fetch and display tide predictions for coastal addresses.
 - **Open Chrome browser**: to view Google Maps location, Zillow, and FlightTrader24 of airport
   - **Optional**: to enable this feature, pass `python3 weather.py --browser` flag when starting the app
 
@@ -87,7 +93,9 @@ Follow the on-screen prompts to:
 2. Get airport weather data from file
 3. Download airport codes and get weather data for random airports
 4. Prompt user to filter airports by code, name, state and municipality
-5. Exit the application
+5. Get Earthquake Information
+6. Get Tides
+7. Exit the application
 
 ## APIs
 
@@ -96,6 +104,8 @@ This application uses:
 - Nominatim Geocoder and Reverse Geocoder API
 - US Census Geocoder API (default)
 - NOAA Weather API (no key required)
+- NOAA Tides and Currents API (no key required)
+- USGS Earthquake API (no key required)
 
 By default, the app uses the US Census Geocoder API for geocoding. To use the Nominatim Geocoder API instead, use the argument `--geocoder nominatim` when running the application:
 
@@ -166,6 +176,7 @@ This command will automatically discover and run all tests located in the `tests
 - [Nominatim Geocoder API Documentation](https://nominatim.org/release-docs/develop/api/Search/)
 
 - [US Census Geocoder API Documentation](https://www.census.gov/data/developers/data-sets/Geocoding-services.html)
+- [USGS Earthquake API Documentation](https://earthquake.usgs.gov/fdsnws/event/1/)
 
 - [pytest Documentation](https://docs.pytest.org/en/stable/)
 
