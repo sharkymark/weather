@@ -78,6 +78,18 @@ To automatically open a Chrome web browser for weather, Google Maps, Flight, Zil
 python weather.py --browser
 ```
 
+To backup data files to /tmp/weather/ and wipe them from the data directory (useful for a fresh start):
+
+```bash
+python weather.py --wipe
+```
+
+You can combine arguments:
+
+```bash
+python weather.py --browser --geocoder nominatim --wipe
+```
+
 Follow the on-screen prompts to:
 
 1. Enter an address or select from previous addresses

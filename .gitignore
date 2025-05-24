@@ -1,8 +1,9 @@
 .aider*
 .env
-data/addresses.txt
-data/airports.txt
-data/airports_download.csv
+# Only track address and airport text files in Git:
+# data/addresses.txt
+# data/airports.txt
+data/airports_download.csv  # Keep ignoring this large CSV file
 !data/.gitkeep
 .vscode/
 venv*

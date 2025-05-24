@@ -1778,16 +1778,70 @@ def airport_weather_main_menu(args):
             print("Returning to Main Menu.")
             return
 
+def backup_and_wipe_data_files():
+    """
+    Backs up data files to /tmp/weather/ with original filenames and wipes them from the data directory.
+    Returns True if successful, False otherwise.
+    """
+    try:
+        # Ensure /tmp directory exists (should on most systems)
+        if not os.path.exists('/tmp'):
+            print("Error: /tmp directory does not exist on this system.")
+            return False
+            
+        # Create /tmp/weather directory if it doesn't exist
+        backup_dir = '/tmp/weather'
+        if not os.path.exists(backup_dir):
+            os.makedirs(backup_dir)
+            print(f"Created backup directory: {backup_dir}")
+            
+        files_to_backup = [
+            (os.path.join(DATA_DIR, ADDRESS_FILE), f"{backup_dir}/{ADDRESS_FILE}"),
+            (os.path.join(DATA_DIR, AIRPORTS_FILE), f"{backup_dir}/{AIRPORTS_FILE}"),
+            (os.path.join(DATA_DIR, AIRPORTS_DOWNLOAD_CSV), f"{backup_dir}/{AIRPORTS_DOWNLOAD_CSV}")
+        ]
+        
+        for src, dst in files_to_backup:
+            if os.path.exists(src):
+                # Copy file to backup directory with original filename
+                with open(src, 'rb') as src_file, open(dst, 'wb') as dst_file:
+                    dst_file.write(src_file.read())
+                print(f"Backed up {src} to {dst}")
+                
+                # Remove original file
+                os.remove(src)
+                print(f"Removed {src}")
+            else:
+                print(f"File {src} does not exist, skipping.")
+        
+        print(f"\nAll data files have been backed up to {backup_dir} with their original filenames and removed from the data directory.")
+        return True
+        
+    except Exception as e:
+        print(f"Error during backup and wipe: {e}")
+        return False
+
 def main():
-
-
     parser = argparse.ArgumentParser(description="Weather App using US Census & NOAA APIs")
     parser.add_argument('--browser', action='store_true',
                        help='Open weather station URLs in Chrome browser (macOS only)')
     parser.add_argument('--geocoder', choices=['census', 'nominatim'], default='census',
                         help='Choose geocoding service: "census" (default) for US Census API, or "nominatim" for OpenStreetMap Nominatim API')
+    parser.add_argument('--wipe', action='store_true',
+                       help='Backup data files to /tmp/weather/ with original filenames and wipe them from the data directory')
     # REMOVED API KEY ARGUMENTS AS PER USER REQUEST
     args = parser.parse_args()
+    
+    # Handle wipe argument if provided
+    if args.wipe:
+        if backup_and_wipe_data_files():
+            print("Data files have been backed up and wiped successfully.")
+        else:
+            print("Failed to backup and wipe data files completely.")
+            answer = input("Do you want to continue with the application? (y/n): ").strip().lower()
+            if answer != 'y':
+                print("Exiting the application.")
+                exit(0)
 
 
     print("Welcome to the Weather App!")
