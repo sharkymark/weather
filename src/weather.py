@@ -1748,6 +1748,36 @@ def _open_url_in_browser(url, args, description="URL"):
     except Exception as e:
         print(f"Could not open browser for {description}: {e}")
 
+def airport_weather_main_menu(args):
+    """Displays the main menu for airport weather functionalities."""
+    while True:
+        print("\n--- Airport Weather Menu ---")
+        print("1. Get weather for specific airport(s) from file")
+        print("2. Download random airports & get weather")
+        print("3. Search airports")
+        print("4. Return to Main Menu")
+        
+        try:
+            choice = input("Enter your choice (1-4): ").strip()
+            if choice == '1':
+                airports_menu(args) # Existing function for specific airports from file
+            elif choice == '2':
+                airport_download(args, print_results=True)
+            elif choice == '3':
+                airport_search(args)
+            elif choice == '4':
+                print("\nReturning to Main Menu...")
+                return
+            else:
+                print("Invalid choice. Please enter 1-4.")
+        except (KeyboardInterrupt, EOFError):
+            print("\n\nOperation cancelled. Returning to Main Menu.") # Consistent with other sub-menus
+            return # Return to main, not exit
+        except Exception as e:
+            print(f"An error occurred in the Airport Weather Menu: {e}")
+            print("Returning to Main Menu.")
+            return
+
 def main():
 
 
@@ -1788,32 +1818,26 @@ def main():
         while True:
             try:
                 print("\nMain Menu:")
-                print("1. Get specific address weather & more")
-                print("2. Get airport weather")
-                print("3. Download random airports & get weather")
-                print("4. Search airports")
-                print("5. Get earthquakes")
-                print("6. Get Tides") # New option
-                print("7. Exit")      # Adjusted numbering
-                choice = input("Enter your choice (1-7): ")
+                print("1. Get specific address weather & more") # Changed from 'weather' to 'weather & more'
+                print("2. Get airport weather") # This will now lead to airport_weather_main_menu
+                print("3. Get earthquakes")     # Renumbered
+                print("4. Get tides")           # Renumbered
+                print("5. Exit")                # Renumbered
+                choice = input("Enter your choice (1-5): ") # Adjusted range
                 print("\n")
                 if choice == '1':
                     address_menu(args)
                 elif choice == '2':
-                    airports_menu(args)
+                    airport_weather_main_menu(args) # Call the new submenu
                 elif choice == '3':
-                    airport_download(args, print_results=True)
-                elif choice == '4':
-                    airport_search(args)
-                elif choice == '5':
                     earthquakes_menu(args)
-                elif choice == '6': # New Tides Menu
+                elif choice == '4': 
                     tides_menu(args)
-                elif choice == '7': # Exit
+                elif choice == '5': 
                     print("\nExiting the program... Goodbye!")
                     break
                 else:
-                    print("Invalid choice. Please enter a number between 1 and 7.")
+                    print("Invalid choice. Please enter a number between 1 and 5.") # Adjusted range
             except (KeyboardInterrupt, EOFError):
                 print("\n\nExiting the program... Goodbye!")
                 exit(0)
