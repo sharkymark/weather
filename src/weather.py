@@ -2,7 +2,7 @@ import requests
 import json
 from urllib.parse import quote
 from halo import Halo
-from datetime import datetime
+from datetime import datetime, timedelta
 import pytz
 import os
 import pandas as pd
@@ -16,6 +16,7 @@ import subprocess
 from urllib.parse import quote_plus
 import argparse
 import platform
+import math
 
 DATA_DIR = "data"
 ADDRESS_FILE = "addresses.txt"
@@ -120,7 +121,7 @@ def geocode_address(address, geocoder="census"):
     finally:
         spinner.stop()
 
-def generate_google_maps_url(latitude, longitude, label):
+def generate_google_maps_url(latitude, longitude, label, zoom=15):
     """
     Generates a Google Maps URL for the given coordinates.
 
@@ -128,13 +129,16 @@ def generate_google_maps_url(latitude, longitude, label):
         latitude: The latitude of the location.
         longitude: The longitude of the location.
         label: Label for the place on google maps
-
+        zoom: The zoom level for the map (default is 15).
+    Example:
+        https://www.google.com/maps/place/-56.4944,147.5272/@-56.4944,147.5272,5z/
+        f"https://www.google.com/maps/search/{latitude},{longitude}/{latitude},{longitude},{zoom}z?t=s"
     Returns:
         A string containing the Google Maps URL.
     """
 
     if label == "":
-        return f"https://www.google.com/maps/search/{latitude},{longitude}/{latitude},{longitude},15z?t=s"
+        return f"https://www.google.com/maps/place/{latitude},{longitude}/@{latitude},{longitude},{zoom}z?t=s"
     else:
         return f"https://www.google.com/maps/place/{quote(label)}"
 
@@ -361,6 +365,30 @@ def format_time(iso_time):
     eastern_tz = pytz.timezone('America/New_York')
     eastern_time = utc_time.astimezone(eastern_tz)
     return eastern_time.strftime("%I:%M %p %Z")
+
+def convert_to_local_time(timestamp_ms=None, dt=None):
+    """
+    Converts a timestamp (in milliseconds since epoch) or datetime object to the user's local time.
+    
+    Args:
+        timestamp_ms: Timestamp in milliseconds since epoch (USGS format).
+        dt: A datetime object to convert (alternative to timestamp_ms).
+        
+    Returns:
+        A formatted string with the local time and date.
+    """
+    if timestamp_ms is not None:
+        # Convert milliseconds to seconds for datetime.fromtimestamp
+        dt = datetime.fromtimestamp(timestamp_ms / 1000)
+    
+    # Get the local timezone
+    local_timezone = datetime.now().astimezone().tzinfo
+    
+    # Convert to local time
+    local_time = dt.replace(tzinfo=pytz.UTC).astimezone(local_timezone)
+    
+    # Format with date and time
+    return local_time.strftime("%Y-%m-%d %I:%M:%S %p %Z")
 
 def convert_kmh_to_mph(kmh):
     """
@@ -1186,6 +1214,548 @@ def airport_download(args, print_results=True):
             station_weather = get_station_weather(random_airports_tuples)
             print_station_forecasts(station_weather, browser=args.browser, census=args.census)
 
+def earthquakes_menu(args):
+    """
+    Displays a menu for fetching and displaying earthquake data.
+    """
+    try:
+        # Main earthquake search loop
+        while True:
+            # Ask for magnitude
+            magnitude_input = input("\nEnter earthquake magnitude to search for (default 5, or range like 3-9): ").strip()
+            
+            min_magnitude = 5  # Default
+            max_magnitude = None
+            
+            # Parse input for magnitude or range
+            if magnitude_input:
+                if "-" in magnitude_input:
+                    # Range like 3-9
+                    try:
+                        parts = magnitude_input.split("-")
+                        min_magnitude = float(parts[0])
+                        max_magnitude = float(parts[1])
+                    except (ValueError, IndexError):
+                        print("Invalid range format. Using default magnitude 5.")
+                        min_magnitude = 5
+                        max_magnitude = None
+                else:
+                    # Single value
+                    try:
+                        min_magnitude = float(magnitude_input)
+                    except ValueError:
+                        print("Invalid magnitude. Using default magnitude 5.")
+                        min_magnitude = 5
+            
+            # Ask for time period
+            print("\nSelect time period:")
+            print("1. Today")
+            print("2. Last 24 hours")
+            print("3. Last 48 hours (default)")
+            print("4. Last week")
+            time_choice = input("Enter your choice (1-4): ").strip()
+            
+            # Set date range based on user choice
+            now = datetime.now()
+            if time_choice == '1':
+                # Today (midnight to now)
+                start_date = now.replace(hour=0, minute=0, second=0, microsecond=0).strftime("%Y-%m-%d")
+                current_date = now.strftime("%Y-%m-%d")
+                time_description = "today"
+            elif time_choice == '2':
+                # Last 24 hours
+                start_date = (now - timedelta(hours=24)).strftime("%Y-%m-%d")
+                current_date = now.strftime("%Y-%m-%d")
+                time_description = "in the last 24 hours"
+            elif time_choice == '4':
+                # Last week
+                start_date = (now - timedelta(days=7)).strftime("%Y-%m-%d")
+                current_date = now.strftime("%Y-%m-%d")
+                time_description = "in the last week"
+            else:
+                # Default to last 48 hours (yesterday to tomorrow)
+                start_date = (now - timedelta(days=1)).strftime("%Y-%m-%d")
+                current_date = (now + timedelta(days=1)).strftime("%Y-%m-%d")
+                time_description = "in the last 48 hours"
+            
+            spinner = Halo(text='Getting USGS data...', spinner='dots')
+            spinner.start()
+            try:
+                # Build URL with magnitude parameters
+                url = f"https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&starttime={start_date}&endtime={current_date}&minmagnitude={min_magnitude}"
+                if max_magnitude is not None:
+                    url += f"&maxmagnitude={max_magnitude}"
+                response = requests.get(url)
+                response.raise_for_status()
+                data = response.json()
+                
+                if not data.get('features'):
+                    if max_magnitude is not None:
+                        print(f"\nNo earthquakes between magnitude {min_magnitude} and {max_magnitude} found today.")
+                    else:
+                        print(f"\nNo earthquakes of magnitude {min_magnitude} or higher found today.")
+                    return
+                
+                if max_magnitude is not None:
+                    print(f"\nEarthquakes between magnitude {min_magnitude} and {max_magnitude} today:")
+                else:
+                    print(f"\nEarthquakes of magnitude {min_magnitude} or higher today:")
+                print("-" * 50)
+                print(f"\nUSGS URL: {url}\n")
+                
+                for feature in data['features']:
+                    properties = feature['properties']
+                    geometry = feature['geometry']
+                    magnitude = properties.get('mag', 'N/A')
+                    place = properties.get('place', 'N/A')
+                    time_ms = properties.get('time', None)
+                    updated_ms = properties.get('updated', None)
+                    tz_offset_minutes = properties.get('tz', None)  # Timezone offset in minutes from UTC
+                    felt_reports = properties.get('felt', 'N/A')  # Number of felt reports
+                    alert_level = properties.get('alert', 'N/A')  # Alert level (e.g., "green", "yellow")
+                    significance = properties.get('sig', 'N/A')  # Significance of the event
+                    event_type = properties.get('type', 'N/A')  # e.g., "earthquake"
+                    title = properties.get('title', 'N/A') # Full title of the event
+
+                    lat, lon = geometry['coordinates'][1], geometry['coordinates'][0]
+
+                    # Convert UTC timestamp to user's local time
+                    local_time_str = convert_to_local_time(timestamp_ms=time_ms)
+                    
+                    # Generate Google Maps URL with a more zoomed-out view
+                    maps_url = generate_google_maps_url(lat, lon, "", zoom=5)
+                    more_info_url = properties.get('url', 'N/A')
+
+                    print(f"Magnitude: {magnitude}")
+                    print(f"Place: {place}")
+                    print(f"Time: {local_time_str}")
+                    print(f"Latitude: {lat}, Longitude: {lon}")
+                    print(f"Google Maps URL: {maps_url}")
+                    print(f"More Info: {more_info_url}")
+
+                    if args.browser:
+                        chrome_path = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+                        webbrowser.register('chrome', None, webbrowser.BackgroundBrowser(chrome_path))
+                        chrome = webbrowser.get('chrome')
+                        if chrome:
+                            subprocess.run([chrome_path, maps_url], stdout=subprocess.DEVNULL)
+                            if more_info_url != 'N/A':
+                                subprocess.run([chrome_path, more_info_url], stdout=subprocess.DEVNULL)
+                        else:
+                            notify_chrome_missing()
+                            
+                    print("-" * 50)               
+            except Exception as e:
+                print(f"\nError getting earthquake data: {e}")
+            finally:
+                spinner.stop()
+        
+        # Post-results menu
+            print("\nOptions:")
+            print("1. Search for earthquakes again")
+            print("2. Return to main menu")
+            
+            post_choice = input("Enter your choice (1-2): ").strip()
+            if post_choice == "2":
+                break
+            elif post_choice == "1":
+                continue
+            else:
+                print("Invalid choice. Returning to main menu.")
+                return
+    
+    except (KeyboardInterrupt, EOFError):
+        print("\n\nExiting the program... Goodbye!")
+        exit(0)
+
+# Functions for Tides (adapted from user-provided code)
+
+# Robust state extraction, similar to what was developed before,
+# as the simple split might be fragile.
+def extract_state_for_tides(matched_address_str):
+    """Extracts the state from a matched address string for tide station lookup."""
+    if not matched_address_str:
+        return None
+    try:
+        parts = matched_address_str.split(',')
+        # Iterate from right to left, looking for a 2-char uppercase state code
+        for part_idx in range(len(parts) - 1, -1, -1):
+            current_part = parts[part_idx].strip()
+            # Check if current_part is "ST"
+            if len(current_part) == 2 and current_part.isupper():
+                return current_part
+            # Check if current_part is "ST ZIP" (e.g., "CA 90210")
+            # and extract ST part
+            if ' ' in current_part:
+                state_candidate = current_part.split(' ')[0]
+                if len(state_candidate) == 2 and state_candidate.isupper():
+                    # Further check if the part after space is numeric (part of ZIP)
+                    zip_candidate = current_part.split(' ')[1]
+                    if zip_candidate.isdigit():
+                        return state_candidate
+        return None  # Fallback if no clear state found
+    except Exception:
+        return None
+
+def haversine_distance(lat1, lon1, lat2, lon2):
+    """Calculate the distance between two points on a sphere using the Haversine formula"""
+    R = 6371  # Radius of the Earth in kilometers
+    lat1, lon1, lat2, lon2 = map(math.radians, [lat1, lon1, lat2, lon2])
+    dlat = lat2 - lat1
+    dlon = lon2 - lon1
+    a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon/2)**2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+    distance = R * c
+    return distance
+
+def noaa_get_nearest_tide_station(latitude, longitude, matched_address_str, args):
+    """Find the nearest NOAA tide station using metadata API"""
+    spinner = Halo(text='Finding nearest NOAA tide station...', spinner='dots')
+    spinner.start()
+
+    state = extract_state_for_tides(matched_address_str)
+    if not state:
+        spinner.fail(f"Could not determine state from '{matched_address_str}' to find relevant tide stations.")
+        return None
+
+    try:
+        # Added type=tidepredictions to filter for stations with tide prediction data
+        url = "https://api.tidesandcurrents.noaa.gov/mdapi/prod/webapi/stations.json?type=tidepredictions&format=json"
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        
+        state_stations = [station for station in data.get('stations', []) if station.get('state') == state]
+        
+        if not state_stations:
+            spinner.warn(f"No NOAA tide stations with prediction data found in {state}.")
+            return None
+            
+        nearest_station_id = None
+        min_distance = float('inf')
+        
+        for station in state_stations:
+            try:
+                station_lat = float(station['lat'])
+                station_lon = float(station.get('lon', station.get('lng'))) # Handle both 'lon' and 'lng'
+                distance = haversine_distance(latitude, longitude, station_lat, station_lon)
+                if distance < min_distance:
+                    min_distance = distance
+                    nearest_station_id = station['id']
+            except (ValueError, TypeError, KeyError):
+                continue # Skip station if lat/lon is invalid or missing
+        
+        if nearest_station_id:
+            spinner.succeed(f"Found nearest tide station: {nearest_station_id} in {state} ({min_distance:.2f} km away).")
+            return nearest_station_id
+        else:
+            spinner.warn(f"Could not find a suitable tide station in {state} with valid coordinates among those with tide predictions.")
+            return None
+            
+    except requests.exceptions.RequestException as e:
+        spinner.fail(f"Error fetching NOAA station data: {e}")
+        return None
+    except Exception as e:
+        spinner.fail(f"An unexpected error occurred while finding nearest station: {e}")
+        return None
+    finally:
+        spinner.stop()
+
+def noaa_get_station_info(station_id, args):
+    """Fetch station information from NOAA API for a given station ID"""
+    spinner = Halo(text=f'Fetching info for NOAA station {station_id}...', spinner='dots')
+    spinner.start()
+    try:
+        url = f"https://api.tidesandcurrents.noaa.gov/mdapi/prod/webapi/stations/{station_id}.json?format=json"
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
+        spinner.succeed(f"Station info for {station_id} fetched.")
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        spinner.fail(f"Error fetching station info for {station_id}: {e}")
+        return None
+    except Exception as e:
+        spinner.fail(f"An unexpected error occurred fetching station info for {station_id}: {e}")
+        return None
+    finally:
+        spinner.stop()
+
+def noaa_display_station_info(station_info_data, args):
+    """Display NOAA tide station information"""
+    if not station_info_data or not station_info_data.get('stations'):
+        print("\nNo station information to display.")
+        return
+
+    station = station_info_data['stations'][0] # API returns a list with one station
+    print("\nNOAA Tide Station Information:")
+    print(f"  Station ID: {station.get('id')}")
+    station_name = station.get('name', 'N/A')
+    station_state = station.get('state', 'N/A')
+    print(f"  Name: {station_name}, {station_state}")
+    # NOAA station metadata uses 'lat' and 'lng'
+    lat = station.get('lat')
+    lon = station.get('lng') 
+    print(f"  Coordinates: Lat: {lat}, Lon: {lon}")
+
+    if lat and lon:
+        # Include state in the label for better context in Google Maps
+        # maps_label = f"{station_name}, {station_state}"
+        # commenting out label to get marker of coordinates only
+        maps_url = generate_google_maps_url(lat, lon, "", zoom=15)
+        print(f"  Google Maps: {maps_url}")
+
+        if args.browser:
+            if platform.system() == 'Darwin':
+                chrome_path = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+                try:
+                    if not os.path.exists(chrome_path):
+                        raise FileNotFoundError(f"Google Chrome not found at {chrome_path}")
+                    
+                    # Use subprocess to open Chrome directly and silently
+                    subprocess.run([chrome_path, maps_url], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+                except (FileNotFoundError, subprocess.CalledProcessError, Exception) as e:
+                    # Broader exception catch for issues with subprocess or file not found
+                    print(f"Could not open in Chrome ({e}). Trying default system browser.")
+                    try:
+                        webbrowser.open_new_tab(maps_url) # Fallback to default browser
+                    except webbrowser.Error as wb_err:
+                        print(f"Fallback browser opening also failed: {wb_err}. Please open URL manually: {maps_url}")
+            else:
+                # For non-macOS systems
+                try:
+                    webbrowser.open_new_tab(maps_url)
+                except webbrowser.Error as wb_err:
+                    print(f"Could not open URL in browser: {wb_err}. Please open manually: {maps_url}")
+    else:
+        print("  (Could not generate Google Maps link due to missing coordinates)")
+
+def noaa_get_tide_data(station_id, args):
+    """Fetch tide data from NOAA API for a given station ID"""
+    spinner = Halo(text=f'Fetching tide data for station {station_id}...', spinner='dots')
+    spinner.start()
+    try:
+        today = datetime.today().strftime("%Y%m%d")
+        # Get data for today and tomorrow
+        tomorrow = (datetime.today() + timedelta(days=1)).strftime("%Y%m%d") 
+        
+        url = "https://api.tidesandcurrents.noaa.gov/api/prod/datagetter"
+        params = {
+            "product": "predictions",
+            "application": "weather_py_app", # Using a custom application name
+            "begin_date": today,
+            "end_date": tomorrow,
+            "datum": "MLLW", # Mean Lower Low Water
+            "station": station_id,
+            "time_zone": "lst_ldt", # Local Standard Time / Local Daylight Time
+            "units": "english", # Feet
+            "interval": "hilo", # High/low tides only
+            "format": "json"
+        }
+        response = requests.get(url, params=params, timeout=15)
+        response.raise_for_status()
+        data = response.json()
+        
+        # NOAA API can return 200 OK with an error message in the JSON body
+        if "error" in data:
+            error_message = data.get("error", {}).get("message", "Unknown API error")
+            spinner.fail(f"API error for station {station_id}: {error_message}")
+            return None
+            
+        spinner.succeed(f"Tide data for station {station_id} fetched.")
+        return data
+    except requests.exceptions.RequestException as e:
+        spinner.fail(f"Error fetching tide data for {station_id}: {e}")
+        return None
+    except Exception as e:
+        spinner.fail(f"An unexpected error occurred fetching tide data for {station_id}: {e}")
+        return None
+    finally:
+        spinner.stop()
+
+def noaa_display_tide_data(tide_data):
+    """Display tide information"""
+    if not tide_data or 'predictions' not in tide_data or not tide_data['predictions']:
+        print("\nNo tide predictions available or error in data.")
+        # If there was an error, it should have been caught by noaa_get_tide_data
+        # This handles cases where predictions list is empty.
+        return
+
+    print("\nTide Predictions (Today & Tomorrow):")
+    for prediction in tide_data['predictions']:
+        try:
+            # Time 't' is already in local time (lst_ldt as requested)
+            # Format: "YYYY-MM-DD HH:MM"
+            time_obj = datetime.strptime(prediction['t'], "%Y-%m-%d %H:%M")
+            tide_type = "High Tide" if prediction['type'] == "H" else "Low Tide"
+            # Format: 03:30 PM, Monday, May 27, 2024 - High Tide: 5.67 ft
+            formatted_time = time_obj.strftime("%I:%M %p, %A, %B %d, %Y")
+            print(f"  {formatted_time} - {tide_type}: {prediction['v']} ft")
+        except (ValueError, KeyError) as e:
+            print(f"  Error parsing prediction data: {prediction}. Error: {e}")
+
+def _handle_tide_logic_for_address(latitude, longitude, matched_address, args):
+    """Internal function to handle fetching and displaying tides for a geocoded address."""
+    print(f"\n--- Getting Tide Information for: {matched_address} ---")
+    print() # Add a newline for separation
+
+    station_id = noaa_get_nearest_tide_station(latitude, longitude, matched_address, args)
+    if not station_id:
+        # Message already printed by noaa_get_nearest_tide_station
+        return
+
+    station_info = noaa_get_station_info(station_id, args)
+    if station_info:
+        noaa_display_station_info(station_info, args) # This already handles browser opening for station
+    else:
+        print(f"\nCould not retrieve detailed information for station {station_id}.")
+        # Continue to try fetching tide data as station_id might still be valid if info call failed
+
+    print() # Add a newline for separation
+    tide_data = noaa_get_tide_data(station_id, args)
+    if tide_data:
+        noaa_display_tide_data(tide_data)
+    else:
+        # Message already printed by noaa_get_tide_data or handled if predictions are empty
+        print(f"\nCould not retrieve tide predictions for station {station_id}.")
+
+    # Open Google Maps for the matched address if browser option is enabled
+    if args.browser and latitude is not None and longitude is not None:
+        print(f"\nOpening Google Maps for the address: {matched_address}...")
+        address_map_url = generate_google_maps_url(latitude, longitude, matched_address)
+        print(f"Google Maps URL for address: {address_map_url}")
+        try:
+            if platform.system() == 'Darwin': # macOS
+                chrome_path = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+                if os.path.exists(chrome_path):
+                    # Try to open with Chrome directly to suppress terminal messages
+                    subprocess.run([chrome_path, address_map_url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                else: # Fallback if Chrome is not at the typical path
+                    webbrowser.open(address_map_url) 
+                    notify_chrome_missing(custom_message="Attempted to open with default browser as Chrome was not found at the standard path.")
+            else: # For other OS, use webbrowser.open (may not be Chrome)
+                webbrowser.open(address_map_url)
+        except Exception as e:
+            print(f"Could not open browser for address map: {e}")
+
+def tides_lookup_new_address(args):
+    """Handles tide lookup for a new address."""
+    try:
+        address_input = input("\nEnter address (street, city, state, zip) or 'Q' to return: ").strip()
+        if address_input.lower() == 'q':
+            return
+        if not address_input:
+            print("No address entered.")
+            return
+    except (KeyboardInterrupt, EOFError):
+        print("\n\nOperation cancelled. Returning to Tides Menu.")
+        return
+
+    # Spinner logic removed from here as geocode_address handles it
+    try:
+        latitude, longitude, matched_address = geocode_address(address_input, geocoder=args.geocoder)
+        # Assuming geocode_address prints its own success/failure
+    except Exception as e:
+        # geocode_address should ideally handle its own error printing related to the API call
+        # This catch is more for unexpected issues during the call itself, though geocode_address might also raise
+        print(f"An unexpected error occurred during geocoding: {e}")
+        return
+
+    if latitude is None or longitude is None:
+        # Message already printed by geocode_address if it failed to match
+        # print("\nAddress not found or geocoding failed. Please try again.")
+        return
+
+    print(f"\nMatched Address: {matched_address}")
+    print(f"Latitude: {latitude}, Longitude: {longitude}")
+    maps_url = generate_google_maps_url(latitude, longitude, matched_address)
+    print(f"Google Maps URL: {maps_url}")
+    
+    # Save address if new and geocoding was successful
+    stored_addresses = load_addresses()
+    if matched_address and matched_address not in stored_addresses:
+        stored_addresses.append(matched_address)
+        save_addresses(stored_addresses)
+        print(f"(Saved '{matched_address}' to stored addresses.)")
+
+    _handle_tide_logic_for_address(latitude, longitude, matched_address, args)
+
+def tides_select_saved_address(args):
+    """Handles tide lookup for a saved address."""
+    stored_addresses = load_addresses()
+    if not stored_addresses:
+        print("\nNo saved addresses found. Please enter a new address first.")
+        return
+
+    sorted_addresses = sorted(stored_addresses, key=lambda addr: addr.split(",")[-2].strip() if len(addr.split(",")) > 1 else "")
+    print("\nSaved addresses (sorted by state code):")
+    for i, addr_str in enumerate(sorted_addresses):
+        print(f"{i+1}. {addr_str}")
+    print("0. Go back")
+
+    try:
+        choice_input = input("\nSelect an address number (or 0 to go back): ").strip()
+        choice = int(choice_input)
+
+        if choice == 0:
+            return
+        if 1 <= choice <= len(sorted_addresses):
+            selected_address_str = sorted_addresses[choice-1]
+            print(f"\nSelected address: {selected_address_str}")
+            print() # Add a newline for separation
+            
+            # Spinner logic removed from here as geocode_address handles it
+            try:
+                # Re-geocode to ensure we have lat/lon, though it should be consistent
+                latitude, longitude, matched_address = geocode_address(selected_address_str, geocoder=args.geocoder)
+                # Assuming geocode_address prints its own success/failure
+            except Exception as e:
+                # geocode_address should ideally handle its own error printing
+                print(f"An unexpected error occurred during geocoding: {e}")
+                return
+
+            if latitude is None or longitude is None:
+                # Message already printed by geocode_address if it failed
+                # print(f"Could not re-geocode saved address: {selected_address_str}")
+                return
+            
+            # Matched address from re-geocoding should ideally be the same as selected_address_str
+            # Using the newly geocoded one for consistency in _handle_tide_logic_for_address
+            _handle_tide_logic_for_address(latitude, longitude, matched_address, args)
+        else:
+            print("Invalid selection.")
+    except ValueError:
+        print("Invalid input. Please enter a number.")
+    except (KeyboardInterrupt, EOFError):
+        print("\n\nOperation cancelled. Returning to Tides Menu.")
+        return
+
+def tides_menu(args):
+    """Display and handle tides menu."""
+    while True:
+        print("\n--- Tides Menu ---")
+        print("1. Enter new address for Tides")
+        print("2. Select from saved addresses for Tides")
+        print("3. Return to Main Menu")
+        
+        try:
+            choice = input("Enter your choice (1-3): ").strip()
+            if choice == "1":
+                tides_lookup_new_address(args)
+            elif choice == "2":
+                tides_select_saved_address(args)
+            elif choice == "3":
+                print("\nReturning to Main Menu...")
+                return
+            else:
+                print("Invalid choice. Please enter 1-3.")
+        except (KeyboardInterrupt, EOFError):
+            print("\n\nExiting the program... Goodbye!")
+            exit(0) # Exit directly as per user's example structure for ^C in sub-menu
+        except Exception as e: # Catch any other unexpected errors in this menu
+            print(f"An error occurred in the Tides Menu: {e}")
+            print("Returning to Main Menu.")
+            return
 
 def main():
 
@@ -1195,6 +1765,7 @@ def main():
                        help='Open weather station URLs in Chrome browser (macOS only)')
     parser.add_argument('--geocoder', choices=['census', 'nominatim'], default='census',
                         help='Choose geocoding service: "census" (default) for US Census API, or "nominatim" for OpenStreetMap Nominatim API')
+    # REMOVED API KEY ARGUMENTS AS PER USER REQUEST
     args = parser.parse_args()
 
 
@@ -1203,48 +1774,55 @@ def main():
 
     if args.geocoder == 'census':
         geocode = "US Census"
-        use_census = True
+        use_census = True 
     else:
-        geocode = "Nominatim"
+        geocode = "Nominatim (via OpenCage)" # OpenCage is a common provider for Nominatim
         use_census = False
 
     print(f"- {geocode} API for geocoding an address")
-    print("- NOAA API for weather data")
+    print("- NOAA API for weather data (Weather.gov)")
+    print("- NOAA API for tide data (TidesandCurrents.noaa.gov)")
 
-    # Check if --browser is enabled on a non-macOS platform
+
     if args.browser and platform.system() != 'Darwin':
         print("\nNote: The --browser option is only supported on macOS. This option will be ignored.")
         args.browser = False
 
-    # Patch args to have .census for downstream compatibility
-    args.census = use_census
+    args.census = use_census 
 
-    notify_api_key_status(args)
+    # REMOVED API KEY NOTIFICATION AS PER USER REQUEST
+    # notify_api_key_status(args) 
 
     try:
         while True:
             try:
                 print("\nMain Menu:")
-                print("1. Get specific address weather")
+                print("1. Get specific address weather & more")
                 print("2. Get airport weather")
                 print("3. Download random airports & get weather")
                 print("4. Search airports")
-                print("5. Exit")
-                choice = input("Enter your choice (1-5): ")
+                print("5. Get earthquakes")
+                print("6. Get Tides") # New option
+                print("7. Exit")      # Adjusted numbering
+                choice = input("Enter your choice (1-7): ")
                 print("\n")
                 if choice == '1':
                     address_menu(args)
                 elif choice == '2':
                     airports_menu(args)
                 elif choice == '3':
-                    airport_download(args, print_results=True)  # Ensure args is passed here
+                    airport_download(args, print_results=True)
                 elif choice == '4':
                     airport_search(args)
                 elif choice == '5':
+                    earthquakes_menu(args)
+                elif choice == '6': # New Tides Menu
+                    tides_menu(args)
+                elif choice == '7': # Exit
                     print("\nExiting the program... Goodbye!")
                     break
                 else:
-                    print("Invalid choice. Please enter a number between 1 and 5.")
+                    print("Invalid choice. Please enter a number between 1 and 7.")
             except (KeyboardInterrupt, EOFError):
                 print("\n\nExiting the program... Goodbye!")
                 exit(0)
