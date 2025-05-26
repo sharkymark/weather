@@ -423,13 +423,55 @@ def convert_temperature(celsius_temperature_data):
         celsius_temperature_data['unitCode'] = ""
     return celsius_temperature_data
 
-def get_nearest_stations(latitude, longitude):
+def print_nearest_station_weather(stations, args, location_description=None):
     """
-    Fetches weather conditions for the 4 nearest weather stations from the NOAA API.
+    Print weather information for the nearest stations.
+    
+    Args:
+        stations: List of station dictionaries containing weather information
+        args: Command line arguments with browser preferences
+        location_description: Optional description of the location (e.g., "tide station Example Bay")
+        
+    Returns:
+        None
+    """
+    if not stations:
+        print("Failed to retrieve weather for nearest stations.")
+        return
+    
+    # Print location context if provided
+    if location_description:
+        print(f"\nShowing weather stations near {location_description}:")
+    
+    print("\n")
+    for station in stations:
+        print(f"Station Name: {station['name']}")
+        print(f"Station ID: {station['station_id']}")
+        print(f"Temperature: {station['temperature']} {station['temperature_unit']}")
+        print(f"Wind Speed: {station['wind_speed']}")
+        print(f"Wind Direction: {station['wind_direction']}")
+        print(f"Google Maps URL for station: {station['address_map_url']}")
+        print("-" * 20)
+
+        # Open browser if requested
+        if args.browser:
+            chrome_path = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+            webbrowser.register('chrome', None, webbrowser.BackgroundBrowser(chrome_path))
+
+            chrome = webbrowser.get('chrome')
+            if chrome:
+                subprocess.run([chrome_path, station['address_map_url']], stdout=subprocess.DEVNULL)
+            else:
+                notify_chrome_missing()
+
+def get_nearest_stations(latitude, longitude, num_stations=2):
+    """
+    Fetches weather conditions for the nearest weather stations from the NOAA API.
 
     Args:
         latitude: The latitude of the location.
         longitude: The longitude of the location.
+        num_stations: Number of nearest stations to retrieve (default is 2)
 
     Returns:
         A list of dictionaries containing the weather conditions for the nearest stations, or None if the API call fails.
@@ -444,7 +486,7 @@ def get_nearest_stations(latitude, longitude):
         stations_response.raise_for_status()
         stations_data = stations_response.json()
 
-        stations = stations_data['features'][:4]
+        stations = stations_data['features'][:num_stations]
 
         station_forecasts = []
         for station in stations:
@@ -871,7 +913,8 @@ def address_menu(args):
             print("4. Get Weather for Nearest Stations")
             print("5. Get Active Weather Alerts")
             print("6. Get Weather for a Different Location")
-            print("7. Return to Main Menu")
+            print("7. Get Tide Information")
+            print("8. Return to Main Menu")
             try:
                 choice = input("Enter your choice: ")
 
@@ -913,31 +956,26 @@ def address_menu(args):
                     else:
                         print("Failed to retrieve hourly forecast.")
                 elif choice == '4':
+                    # Prompt for number of stations
+                    while True:
+                        try:
+                            num_stations_input = input("Enter the number of nearest stations to display (1-10, default is 2): ")
+                            if not num_stations_input:
+                                num_stations = 2
+                                break
+                            num_stations = int(num_stations_input)
+                            if 1 <= num_stations <= 10:
+                                break
+                            else:
+                                print("Invalid input. Please enter a number between 1 and 10.")
+                        except ValueError:
+                            print("Invalid input. Please enter a number.")
+                    
                     print("Getting weather for nearest stations...")
-                    stations = get_nearest_stations(latitude, longitude)
-                    if stations:
-                        print("\n")
-
-                        for station in stations:
-                            print(f"Station Name: {station['name']}")
-                            print(f"Station ID: {station['station_id']}")
-                            print(f"Temperature: {station['temperature']} {station['temperature_unit']}")
-                            print(f"Wind Speed: {station['wind_speed']}")
-                            print(f"Wind Direction: {station['wind_direction']}")
-                            print(f"Google Maps URL for station: {station['address_map_url']}")
-                            print("-" * 20)
-
-                            if args.browser:
-                                chrome_path = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-                                webbrowser.register('chrome', None, webbrowser.BackgroundBrowser(chrome_path))
-
-                                chrome = webbrowser.get('chrome')
-                                if chrome:
-                                    subprocess.run([chrome_path, station['address_map_url']], stdout=subprocess.DEVNULL)
-                                else:
-                                    notify_chrome_missing()
-                    else:
-                        print("Failed to retrieve weather for nearest stations.")
+                    stations = get_nearest_stations(latitude, longitude, num_stations)
+                    
+                    # Use the helper function to print station weather information
+                    print_nearest_station_weather(stations, args, f"address {matched_address}")
                 elif choice == '5':
                     print("Getting active weather alerts...")
                     alerts = get_active_alerts(latitude, longitude)
@@ -1023,7 +1061,11 @@ def address_menu(args):
                         else:
                             notify_chrome_missing()
                 elif choice == '7':
-                    print("\n Returning to main menu...")
+                    # Call tide functionality for the current address
+                    print("\nGetting tide information...")
+                    _handle_tide_logic_for_address(latitude, longitude, matched_address, args)
+                elif choice == '8':
+                    print("\nReturning to main menu...")
                     return
                 else:
                     print("Invalid choice. Please try again.")
@@ -1582,12 +1624,17 @@ def _handle_tide_logic_for_address(latitude, longitude, matched_address, args):
     
     station_map_url_to_open = None
     station_name_for_desc = station_id # Default to ID for description
+    station_latitude = None
+    station_longitude = None
 
     if station_info:
         # Display station info and get its map URL (without opening it yet)
         station_map_url_to_open = noaa_display_station_info(station_info) # No args passed here
         if station_info.get('stations'):
-            station_name_for_desc = station_info['stations'][0].get('name', station_id)
+            station = station_info['stations'][0]
+            station_name_for_desc = station.get('name', station_id)
+            station_latitude = station.get('lat')
+            station_longitude = station.get('lng')
     else:
         print(f"\nCould not retrieve detailed information for station {station_id}.")
 
@@ -1597,7 +1644,8 @@ def _handle_tide_logic_for_address(latitude, longitude, matched_address, args):
         noaa_display_tide_data(tide_data)
     else:
         print(f"\nCould not retrieve tide predictions for station {station_id}.")
-
+        
+    # Open maps in browser first if browser option is enabled
     if args.browser:
         # 1. Open Google Maps for the matched address first
         if latitude is not None and longitude is not None:
@@ -1607,6 +1655,47 @@ def _handle_tide_logic_for_address(latitude, longitude, matched_address, args):
         # 2. Then, open Google Maps for the tide station (if URL is available)
         if station_map_url_to_open:
             _open_url_in_browser(station_map_url_to_open, args, description=f"Google Maps for tide station '{station_name_for_desc}'")
+    
+    # After displaying tide data, show a menu with more options
+    if station_latitude and station_longitude:
+        # Create a menu for tide station options
+        while True:
+            print("\n--- Tide Station Options ---")
+            print("1. Get Weather for Nearest Stations")
+            print("2. Return to Previous Menu")
+            
+            try:
+                option = input("Enter your choice (1-2): ").strip()
+                
+                if option == "1":
+                    # Prompt for number of stations to display
+                    num_stations = 2  # Default value
+                    while True:
+                        try:
+                            num_stations_input = input("Enter the number of nearest stations to display (1-10, default is 2): ")
+                            if not num_stations_input:
+                                num_stations = 2
+                                break
+                            num_stations = int(num_stations_input)
+                            if 1 <= num_stations <= 10:
+                                break
+                            else:
+                                print("Invalid input. Please enter a number between 1 and 10.")
+                        except ValueError:
+                            print("Invalid input. Please enter a number.")
+                    
+                    print(f"\nGetting weather for {num_stations} stations near tide station {station_name_for_desc}...")
+                    stations = get_nearest_stations(station_latitude, station_longitude, num_stations)
+                    
+                    # Use the helper function to print station weather information
+                    print_nearest_station_weather(stations, args, f"tide station {station_name_for_desc}")
+                elif option == "2":
+                    break
+                else:
+                    print("Invalid option. Please enter 1 or 2.")
+            except (KeyboardInterrupt, EOFError):
+                print("\n\nReturning to previous menu...")
+                break
 
 def tides_lookup_new_address(args):
     """Handles tide lookup for a new address."""
