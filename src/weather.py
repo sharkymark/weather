@@ -912,8 +912,8 @@ def address_menu(args):
             print("3. Get Hourly Forecast")
             print("4. Get Weather for Nearest Stations")
             print("5. Get Active Weather Alerts")
-            print("6. Get Weather for a Different Location")
-            print("7. Get Tide Information")
+            print("6. Get Tide Information")
+            print("7. Get Weather for a Different Location")
             print("8. Return to Main Menu")
             try:
                 choice = input("Enter your choice: ")
@@ -993,6 +993,10 @@ def address_menu(args):
                     else:
                         print("No active weather alerts for this location.")
                 elif choice == '6':
+                    # Call tide functionality for the current address
+                    print("\nGetting tide information...")
+                    _handle_tide_logic_for_address(latitude, longitude, matched_address, args)
+                elif choice == '7':
                     stored_addresses = load_addresses()
                     if stored_addresses:
                         # Sort addresses by state code (assumes state code is the second-to-last element in the address)
@@ -1060,10 +1064,6 @@ def address_menu(args):
                             subprocess.run([chrome_path, zillow_url], stdout=subprocess.DEVNULL)
                         else:
                             notify_chrome_missing()
-                elif choice == '7':
-                    # Call tide functionality for the current address
-                    print("\nGetting tide information...")
-                    _handle_tide_logic_for_address(latitude, longitude, matched_address, args)
                 elif choice == '8':
                     print("\nReturning to main menu...")
                     return
