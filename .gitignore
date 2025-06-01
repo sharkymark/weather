@@ -8,3 +8,4 @@ data/airports_download.csv
 venv*
 __pycache__/
 .pytest_cache*
+src/print_stations_helper.py
